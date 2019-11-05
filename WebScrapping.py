@@ -9,8 +9,8 @@ import urllib.request
 import os
 import argparse
 
-CLASS_NAME = "infocard-list infocard-list-pkmn-lg"
-
+CLASS_NAME = "data-table block-wide"
+LINK_POKEMON = "https://pokemondb.net/pokedex/all"
 
 def export_data(link):
     """
@@ -18,15 +18,15 @@ def export_data(link):
     """
     html = requests.get(link)
     html.encoding = 'ISO-8859-1'
-    soup = BeautifulSoup(html.text, 'html.parser')
-    pokemon_list = soup.find_all('div', attrs={'class': CLASS_NAME})
+    soup_extraction = BeautifulSoup(html.text, 'html.parser')
+    pokemon_list = soup_extraction.find_all('table', attrs={'class': CLASS_NAME})
     for pokemon in pokemon_list:  # Print all occurrences
         print(pokemon.get_text())
     return pokemon_list
 
 
 def main():
-    export_data('https://pokemondb.net/pokedex/national')
+    export_data(LINK_POKEMON)
 
 
 if __name__ == '__main__':
