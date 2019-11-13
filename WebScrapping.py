@@ -9,9 +9,20 @@ import urllib.request
 import os
 import argparse
 import pandas as pd
-from tqdm import tnrange, tqdm_notebook
+# from tqdm import tnrange, tqdm_notebook
+import time
+from selenium import webdriver
 
+SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
+ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
+TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
+SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
+DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"
+LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
+LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
+BALISE_A = 'a'
+BALISE_HREF = 'href'
 
 
 def export_data_topic(link):
@@ -26,50 +37,63 @@ def export_data_topic(link):
     return topic
 
 
+def browser_scroll(browser):
+    last_height = browser.execute_script("return document.body.scrollHeight")
+    while True:
+        browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(SCROLL_PAUSE_TIME)
+        new_height = browser.execute_script("return document.body.scrollHeight")
+        if new_height == last_height:
+            break
+        last_height = new_height
+    return BeautifulSoup(browser.page_source, "html.parser")
+
+
 def export_articles(link_dict):
     topic_list = []
-    link_list = []
+    link_list_topic = []
     for topic, link in link_dict.items():
         topic_list.append(topic)
-        link_list.append(link)
-    data_frame = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [], 'Read_time': [], 'is_Premium': []}
+        link_list_topic.append(link)
+    data_frame = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
+                  'Read_time': [], 'is_Premium': [], 'Link_Author': [], 'Link_Article': []}
     data_frame = pd.DataFrame(data=data_frame)
-    indice_table = 0
-    for j in tqdm_notebook(range(3)):
-        for i in tqdm_notebook(range(len(topic_list))):
-            response2 = requests.get(link_list[i])
-            soup2 = BeautifulSoup(response2.text, "html.parser")
-            sub = soup2.findAll(
-                class_='postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis')[j]
-            sub_autor = sub.findAll('a')[0].text
-            sub_time = sub.findAll('time')[0]
-            sub_min = sub.findAll(class_='readingTime')[0]
+    row = 0
+    browser = webdriver.Chrome(DRIVER)
+    for i in range(len(topic_list)):
+        browser.get(link_list_topic[i])
+        soup2 = browser_scroll(browser)
+        for j in range(50):
             try:
-                sub_prem = sub.findAll(class_='svgIcon-use')[0]
-                sub_prem = True
+                sub = soup2.findAll(class_=ARTICLE_CLASS)[j]
+
+                sub2 = soup2.findAll(class_=LINK_ARTICLE_LINK)[j]
+                sub_link_article = sub2.findAll('a')[0]
+
+                sub_author = sub.findAll(BALISE_A)[0]
+                sub_time = sub.findAll('time')[0]
+                sub_min = sub.findAll(class_='readingTime')[0]
+                try:
+                    sub_premium = True if sub.findAll(class_='svgIcon-use')[0] != '' else ''
+                except:
+                    sub_premium = False
+                data_frame.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
+                data_frame.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
+                data_frame.loc[row, 'Author'] = sub_author.text
+                data_frame.loc[row, 'Page'] = topic_list[i]
+                data_frame.loc[row, 'Date'] = sub_time['datetime']
+                data_frame.loc[row, 'Read_time'] = sub_min['title']
+                data_frame.loc[row, 'is_Premium'] = sub_premium
+                data_frame.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
+                data_frame.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
+                row += 1
             except:
-                sub_prem = False
-            data_frame.loc[indice_table, 'Title'] = soup2.findAll(
-                class_='u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 '
-                       'u-fontSize24')[
-                j].text
-            data_frame.loc[indice_table, 'Subtitle'] = soup2.findAll(
-                class_='u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal '
-                       'u-baseColor--textNormal')[
-                j].text
-            data_frame.loc[indice_table, 'Author'] = sub_autor
-            data_frame.loc[indice_table, 'Page'] = topic_list[i]
-            data_frame.loc[indice_table, 'Date'] = sub_time['datetime']
-            data_frame.loc[indice_table, 'Read_time'] = sub_min['title']
-            data_frame.loc[indice_table, 'is_Premium'] = sub_prem
-            indice_table += 1
+                pass
     return data_frame
 
 
 def main():
     topic_link_dict = export_data_topic(LINK)
-    #     for key,value in topic_link_dict.items() :
-    #         print (key, value)
     data_frame = export_articles(topic_link_dict)
     print(data_frame)
 
