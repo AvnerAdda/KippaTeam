@@ -2,32 +2,27 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
-import csv
 
-from bs4 import BeautifulSoup as bs, BeautifulSoup
-import requests
-import urllib.request
+
+import csv
 import os
-import argparse
-import pandas as pd
-# from tqdm import tnrange, tqdm_notebook
 import time
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
 ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
 TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
-SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
-#C:\Users\Nathan\Desktop\chromedriver_win32
+SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal ' \
+                  'u-baseColor--textNormal '
 DRIVER = "C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe"
-
 LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
 LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
 BALISE_A = 'a'
 BALISE_HREF = 'href'
-
 AUTHOR_NAME = 'ui-h2 hero-title'
 MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
 DESCRIPTION = 'ui-body hero-description'
@@ -37,7 +32,11 @@ AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
 
 def export_data_topic(link):
     """
-    Export Toward_Data_Science
+    This function gets the links to the five "data science" themed topics that are available on the towardsdatascience
+    homepage. The input is a link to the towardsdatascience homepage and the output is a dictionary containing the names
+    of each topic and their corresponding links.
+    :param link: string
+    :return: topic: list
     """
     html = requests.get(link)
     topic = {}
@@ -48,6 +47,12 @@ def export_data_topic(link):
 
 
 def browser_scroll(browser):
+    """
+    This function defines automated browsing through the desired web page which allows for the access to raw html that
+    is only available through scrolling.
+    :param browser: browser object
+    :return: Beautiful Soup object
+    """
     last_height = browser.execute_script("return document.body.scrollHeight")
     while True:
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -59,16 +64,23 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
-# Second Data Frame: Article
 def export_articles(link_dict):
+    """
+    This function creates an articles dataframe which contains the following information about an article:
+    Title, Subtitle, Page, Author, Date, Read_time, is_Premium, Link_Author, Link_Article.
+    The function takes a dictionary of topic links, iterates through the dictionary to extract raw html from each topic
+    page (using the previously defined browser) and extracts the exact information to populate the dataframe.
+    :param link_dict: dictionary
+    :return: data_frame: dataframe
+    """
     topic_list = []
     link_list_topic = []
     for topic, link in link_dict.items():
         topic_list.append(topic)
         link_list_topic.append(link)
-    data_frame = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
+    article = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
                   'Read_time': [], 'is_Premium': [], 'Link_Author': [], 'Link_Article': []}
-    data_frame = pd.DataFrame(data=data_frame)
+    article = pd.DataFrame(data=article)
     row = 0
     browser = webdriver.Chrome(DRIVER)
     for i in range(len(topic_list)):
@@ -88,22 +100,31 @@ def export_articles(link_dict):
                     sub_premium = True if sub.findAll(class_='svgIcon-use')[0] != '' else ''
                 except:
                     sub_premium = False
-                data_frame.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
-                data_frame.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
-                data_frame.loc[row, 'Author'] = sub_author.text
-                data_frame.loc[row, 'Page'] = topic_list[i]
-                data_frame.loc[row, 'Date'] = sub_time['datetime']
-                data_frame.loc[row, 'Read_time'] = sub_min['title']
-                data_frame.loc[row, 'is_Premium'] = sub_premium
-                data_frame.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
-                data_frame.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
+                article.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
+                article.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
+                article.loc[row, 'Author'] = sub_author.text
+                article.loc[row, 'Page'] = topic_list[i]
+                article.loc[row, 'Date'] = sub_time['datetime']
+                article.loc[row, 'Read_time'] = sub_min['title']
+                article.loc[row, 'is_Premium'] = sub_premium
+                article.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
+                article.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
                 row += 1
             except:
                 pass
-    return data_frame
+    return article
 
 
 def export_authors(data_frame_article):
+    """
+    This function creates an author dataframe which contains the following information about each author of an article
+    in the article dataframe:
+    Name, Member_Since, Description, Following, Followers, Social_Media.
+    The function takes a dataframe of articles as its input and iterates through each "Link_Author" in the dataframe,
+    extracts raw html from each author page, and extracts exact information to populate the dataframe.
+    :param data_frame_article: dataframe
+    :return: author: dataframe
+    """
     author = {'Name': [], 'Member_Since': [], 'Description': [], 'Following': [], 'Followers': [], 'Social_Media': []}
     author = pd.DataFrame(data=author)
     row = 0
@@ -153,14 +174,14 @@ def compare_two_file(file1, file2):
     Compare 2 files
     The files must be csv
     """
-    with open('file1', encoding="utf-8") as t1, open(file2, encoding="utf-8") as t2:
-        fileone = csv.reader(t1, delimiter=',')
-        filetwo = csv.reader(t2, delimiter=',')
+    with open(file1, encoding="utf-8") as t1, open(file2, encoding="utf-8") as t2:
+        file_one = csv.reader(t1, delimiter=',')
+        file_two = csv.reader(t2, delimiter=',')
         title1 = [];
         title2 = []
-        for line in filetwo:
+        for line in file_two:
             title1.append(line[0])
-        for line in fileone:
+        for line in file_one:
             title2.append(line[0])
         diff_doc1 = 0
         for i in title1:
@@ -181,7 +202,6 @@ def main():
     topic_link_dict = export_data_topic(LINK)
     data_frame_article = export_articles(topic_link_dict)
     data_frame_author = export_authors(data_frame_article)
-
     print(data_frame_article.head())
     print(data_frame_author.head())
 
