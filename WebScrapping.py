@@ -2,23 +2,22 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
-
-
 import csv
-import os
-import time
-import pandas as pd
-import requests
+
 from bs4 import BeautifulSoup
+import requests
+import os
+import pandas as pd
+import time
 from selenium import webdriver
+import re
 
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
 ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
 TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
-SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal ' \
-                  'u-baseColor--textNormal '
-DRIVER = "C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe"
+SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
+DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"  # To change
 LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
 LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
 BALISE_A = 'a'
@@ -78,9 +77,9 @@ def export_articles(link_dict):
     for topic, link in link_dict.items():
         topic_list.append(topic)
         link_list_topic.append(link)
-    article = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
+    data_frame = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
                   'Read_time': [], 'is_Premium': [], 'Link_Author': [], 'Link_Article': []}
-    article = pd.DataFrame(data=article)
+    data_frame = pd.DataFrame(data=data_frame)
     row = 0
     browser = webdriver.Chrome(DRIVER)
     for i in range(len(topic_list)):
@@ -100,19 +99,19 @@ def export_articles(link_dict):
                     sub_premium = True if sub.findAll(class_='svgIcon-use')[0] != '' else ''
                 except:
                     sub_premium = False
-                article.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
-                article.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
-                article.loc[row, 'Author'] = sub_author.text
-                article.loc[row, 'Page'] = topic_list[i]
-                article.loc[row, 'Date'] = sub_time['datetime']
-                article.loc[row, 'Read_time'] = sub_min['title']
-                article.loc[row, 'is_Premium'] = sub_premium
-                article.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
-                article.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
+                data_frame.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
+                data_frame.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
+                data_frame.loc[row, 'Author'] = sub_author.text
+                data_frame.loc[row, 'Page'] = topic_list[i]
+                data_frame.loc[row, 'Date'] = sub_time['datetime']
+                data_frame.loc[row, 'Read_time'] = sub_min['title']
+                data_frame.loc[row, 'is_Premium'] = sub_premium
+                data_frame.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
+                data_frame.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
                 row += 1
             except:
                 pass
-    return article
+    return data_frame
 
 
 def export_authors(data_frame_article):
@@ -144,10 +143,10 @@ def export_authors(data_frame_article):
         info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
 
         try:
-            info_author_plus.findAll('a')[2]['aria-label']
-            Social_Media = True
+            test = info_author_plus.findAll('a')[2]['aria-label']
+            social_media = True
         except:
-            Social_Media = False
+            social_media = False
 
         try:
             following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
@@ -164,20 +163,43 @@ def export_authors(data_frame_article):
         author.loc[row, 'Description'] = desc_author
         author.loc[row, 'Following'] = following_author
         author.loc[row, 'Followers'] = follower_author
-        author.loc[row, 'Social_Media'] = Social_Media
+        author.loc[row, 'Social_Media'] = social_media
         row += 1
     return author
 
 
+def export_articles_details(data_frame_article):
+    """
+    This function import more details about the articles of the first dataframe. We have the Title as the key, we have
+    the number of claps (as like for facebook) and the different tags on the article>
+    :param data_frame_article: the first dataframe
+    :return: the dataframe of hte detail of each article
+    """
+    details_articles = {'Title': [], 'Claps': [], 'Tags': []}
+    details_articles = pd.DataFrame(data=details_articles)
+    row = 0
+    for i in range(len(data_frame_article['Link_Article'])):
+        html = requests.get(data_frame_article.iloc[i, 8])
+        soup_extraction = BeautifulSoup(html.text, 'html.parser')
+        text = soup_extraction.text
+        clap = re.search(r"(?<=clapCount\"\:)([0-9]+)", text)[0]
+        tags = '; '.join(re.findall(r"(?<=\"\,\"Tag\:).*?(?=\"\,)", text))
+        details_articles.loc[row, 'Title'] = data_frame_article.iloc[i, 0]
+        details_articles.loc[row, 'Claps'] = clap
+        details_articles.loc[row, 'Tags'] = tags
+        row += 1
+    return details_articles
+
+
 def compare_two_file(file1, file2):
     """
-    Compare 2 files
+    Compare 2 files (this function could permit to see how many data could we have by day)
     The files must be csv
     """
     with open(file1, encoding="utf-8") as t1, open(file2, encoding="utf-8") as t2:
         file_one = csv.reader(t1, delimiter=',')
         file_two = csv.reader(t2, delimiter=',')
-        title1 = [];
+        title1 = []
         title2 = []
         for line in file_two:
             title1.append(line[0])
@@ -192,20 +214,26 @@ def compare_two_file(file1, file2):
 
 def export_csv(data_frame):
     """
-    Export to csv
+    Export to csv the files
     """
     file_name = os.getcwd() + '\\TDS_' + time.strftime("%d_%b_%Y_%H%M", time.gmtime()) + '.csv'
     data_frame.to_csv(file_name, index=None, header=True)
 
 
 def main():
+    print('Each step could take time, so no worry')
+    print('Extract Topics')
     topic_link_dict = export_data_topic(LINK)
+    print('Extract Articles')
     data_frame_article = export_articles(topic_link_dict)
-    data_frame_author = export_authors(data_frame_article)
     print(data_frame_article.head())
+    print('Extract Authors')
+    data_frame_author = export_authors(data_frame_article)
     print(data_frame_author.head())
+    print('Extract Articles Details')
+    data_frame_articles_detail = export_articles_details(data_frame_article)
+    print(data_frame_articles_detail.head())
 
 
 if __name__ == '__main__':
     main()
-
