@@ -2,6 +2,7 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
+import csv
 
 from bs4 import BeautifulSoup as bs, BeautifulSoup
 import requests
@@ -12,17 +13,26 @@ import pandas as pd
 # from tqdm import tnrange, tqdm_notebook
 import time
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
 ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
 TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
 SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
-DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"
+#C:\Users\Nathan\Desktop\chromedriver_win32
+DRIVER = "C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe"
+
 LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
 LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
 BALISE_A = 'a'
 BALISE_HREF = 'href'
+
+AUTHOR_NAME = 'ui-h2 hero-title'
+MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
+DESCRIPTION = 'ui-body hero-description'
+FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
+AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
 
 
 def export_data_topic(link):
@@ -49,6 +59,7 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
+# Second Data Frame: Article
 def export_articles(link_dict):
     topic_list = []
     link_list_topic = []
@@ -92,11 +103,89 @@ def export_articles(link_dict):
     return data_frame
 
 
+def export_authors(data_frame_article):
+    author = {'Name': [], 'Member_Since': [], 'Description': [], 'Following': [], 'Followers': [], 'Social_Media': []}
+    author = pd.DataFrame(data=author)
+    row = 0
+    for i in range(len(data_frame_article['Link_Author'])):
+        html = requests.get(data_frame_article.iloc[i, 7])
+        soup_extraction = BeautifulSoup(html.text, 'html.parser')
+        name_author = soup_extraction.findAll('h1')[0].text
+        try:
+            member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
+        except:
+            member_since = 'NULL'
+        try:
+            desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
+        except:
+            desc_author = 'NULL'
+
+        info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
+
+        try:
+            info_author_plus.findAll('a')[2]['aria-label']
+            Social_Media = True
+        except:
+            Social_Media = False
+
+        try:
+            following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
+        except:
+            following_author = 'NULL'
+
+        try:
+            follower_author = info_author_plus.findAll('a')[1]['aria-label'].split(' ')[1]
+        except:
+            follower_author = 'NULL'
+
+        author.loc[row, 'Name'] = name_author
+        author.loc[row, 'Member_Since'] = member_since[19:]
+        author.loc[row, 'Description'] = desc_author
+        author.loc[row, 'Following'] = following_author
+        author.loc[row, 'Followers'] = follower_author
+        author.loc[row, 'Social_Media'] = Social_Media
+        row += 1
+    return author
+
+
+def compare_two_file(file1, file2):
+    """
+    Compare 2 files
+    The files must be csv
+    """
+    with open('file1', encoding="utf-8") as t1, open(file2, encoding="utf-8") as t2:
+        fileone = csv.reader(t1, delimiter=',')
+        filetwo = csv.reader(t2, delimiter=',')
+        title1 = [];
+        title2 = []
+        for line in filetwo:
+            title1.append(line[0])
+        for line in fileone:
+            title2.append(line[0])
+        diff_doc1 = 0
+        for i in title1:
+            if i not in title2:
+                diff_doc1 += 1
+        print('There is ' + str(diff_doc1) + ' differences between these 2 versions.')
+
+
+def export_csv(data_frame):
+    """
+    Export to csv
+    """
+    file_name = os.getcwd() + '\\TDS_' + time.strftime("%d_%b_%Y_%H%M", time.gmtime()) + '.csv'
+    data_frame.to_csv(file_name, index=None, header=True)
+
+
 def main():
     topic_link_dict = export_data_topic(LINK)
-    data_frame = export_articles(topic_link_dict)
-    print(data_frame)
+    data_frame_article = export_articles(topic_link_dict)
+    data_frame_author = export_authors(data_frame_article)
+
+    print(data_frame_article.head())
+    print(data_frame_author.head())
 
 
 if __name__ == '__main__':
     main()
+
