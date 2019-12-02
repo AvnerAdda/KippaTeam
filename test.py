@@ -15,35 +15,36 @@ from selenium.webdriver.common.keys import Keys
 import re
 import datetime
 import pymysql
+import config
 
-SCROLL_PAUSE_TIME = 2
-LINK = "https://towardsdatascience.com/"
-ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
-TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
-SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
+# SCROLL_PAUSE_TIME = 2
+# LINK = "https://towardsdatascience.com/"
+# ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
+# TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
+# SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
 
-DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"
+DRIVER = 'C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe' # cli
 
-LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
-LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
-BALISE_A = 'a'
-BALISE_HREF = 'href'
-
-AUTHOR_NAME = 'ui-h2 hero-title'
-MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
-DESCRIPTION = 'ui-body hero-description'
-FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
-AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
+# LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
+# LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
+# BALISE_A = 'a'
+# BALISE_HREF = 'href'
+#
+# AUTHOR_NAME = 'ui-h2 hero-title'
+# MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
+# DESCRIPTION = 'ui-body hero-description'
+# FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
+# AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
 
 # Create a connection object
-databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
-databaseUserName = "root"  # User name of the database server
-databaseUserPassword = "avner"  # Password for the database user
-newDatabaseName = "TowardDataScience"  # Name of the database that is to be created
-charSet = "utf8mb4"  # Character set
+# databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
+# databaseUserName = "root"  # User name of the database server
+databaseUserPassword = "redboxb,b500"  # Password for the database user --------cli
+newDatabaseName = "TowardDataScience"  # Name of the database that is to be created   -------cli
+# charSet = "utf8mb4"  # Character set
 cursorType = pymysql.cursors.DictCursor
-connectionInstance = pymysql.connect(host=databaseServerIP, user=databaseUserName, password=databaseUserPassword,
-                                     charset=charSet, cursorclass=cursorType)
+connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName, password=databaseUserPassword,
+                                     charset=config.charSet, cursorclass=cursorType)
 
 
 def export_data_topic(link):
@@ -72,7 +73,7 @@ def browser_scroll(browser):
     last_height = browser.execute_script("return document.body.scrollHeight")
     while True:
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(SCROLL_PAUSE_TIME)
+        time.sleep(config.SCROLL_PAUSE_TIME)
         new_height = browser.execute_script("return document.body.scrollHeight")
         if new_height == last_height:
             break
@@ -102,10 +103,10 @@ def export_sql_articles(link_dict, cur):
             soup2 = browser_scroll(browser)
             for j in range(50):
                 try:
-                    sub = soup2.findAll(class_=ARTICLE_CLASS)[j]
-                    sub2 = soup2.findAll(class_=LINK_ARTICLE_LINK)[j]
+                    sub = soup2.findAll(class_=config.ARTICLE_CLASS)[j]
+                    sub2 = soup2.findAll(class_=config.LINK_ARTICLE_LINK)[j]
                     sub_link_article = sub2.findAll('a')[0]
-                    sub_author = sub.findAll(BALISE_A)[0]
+                    sub_author = sub.findAll(config.BALISE_A)[0]
                     sub_time = sub.findAll('time')[0]
                     sub_min = sub.findAll(class_='readingTime')[0]
                     date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
@@ -117,14 +118,14 @@ def export_sql_articles(link_dict, cur):
                      author, page , date , read_time , is_Premium , link_author ,link_article) \
                                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                     recordTuple = (int(row),
-                                   soup2.findAll(class_=TITLE_CLASS)[j].text,
-                                   soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
+                                   soup2.findAll(class_=config.TITLE_CLASS)[j].text,
+                                   soup2.findAll(class_=config.SUB_TITLE_CLASS)[j].text,
                                    str(sub_author.text),
                                    str(topic_list[i]),
                                    date_format.isoformat(),
                                    int(sub_min['title'].split(' ')[0]),
                                    sub_premium,
-                                   str(sub_author[BALISE_HREF]),
+                                   str(sub_author[config.BALISE_HREF]),
                                    str(sub_link_article['data-action-value']))
                     cur.execute(mySql_insert_query, recordTuple)
                     if row % 100 == 0:
@@ -137,64 +138,11 @@ def export_sql_articles(link_dict, cur):
     except Exception as e:
         print("Exception occured:{}".format(e))
 
-# def export_authors(author_link, curr):
-#     """
-#     This function creates an author dataframe which contains the following information about each author of an article
-#     in the article dataframe:
-#     Name, Member_Since, Description, Following, Followers, Social_Media.
-#     The function takes a dataframe of articles as its input and iterates through each "Link_Author" in the dataframe,
-#     extracts raw html from each author page, and extracts exact information to populate the dataframe.
-#     :param data_frame_article: dataframe
-#     :return: author: dataframe
-#     """
-#     author = {'Name': [], 'Member_Since': [], 'Description': [], 'Following': [], 'Followers': [], 'Social_Media': []}
-#     author = pd.DataFrame(data=author)
-#     row = 0
-#     for i in range(len(author_link)):
-#         html = requests.get(data_frame_article.iloc[i, 7])
-#         soup_extraction = BeautifulSoup(html.text, 'html.parser')
-#         name_author = soup_extraction.findAll('h1')[0].text
-#         try:
-#             member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
-#         except:
-#             member_since = 'NULL'
-#         try:
-#             desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
-#         except:
-#             desc_author = 'NULL'
-#
-#         info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
-#
-#         try:
-#             test = info_author_plus.findAll('a')[2]['aria-label']
-#             social_media = True
-#         except:
-#             social_media = False
-#
-#         try:
-#             following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
-#         except:
-#             following_author = 'NULL'
-#
-#         try:
-#             follower_author = info_author_plus.findAll('a')[1]['aria-label'].split(' ')[1]
-#         except:
-#             follower_author = 'NULL'
-#
-#         author.loc[row, 'Name'] = name_author
-#         author.loc[row, 'Member_Since'] = member_since[19:]
-#         author.loc[row, 'Description'] = desc_author
-#         author.loc[row, 'Following'] = following_author
-#         author.loc[row, 'Followers'] = follower_author
-#         author.loc[row, 'Social_Media'] = social_media
-#         row += 1
-#     return author
-
 
 def main():
     print('Each step could take time, so no worry')
     print('Extract Topics')
-    topic_link_dict = export_data_topic(LINK)
+    topic_link_dict = export_data_topic(config.LINK)
     print('Create Database')
     cursorInstance = connectionInstance.cursor()
     sqlStatement = "CREATE DATABASE " + newDatabaseName
@@ -230,7 +178,7 @@ def main():
     list_dict_author = cursorInstance.fetchall()
     for dict_author in list_dict_author:
         link_author.append(dict_author['link_author'])
-    data_frame_author = export_authors(list_dict_author, cursorInstance)
+    # data_frame_author = export_authors(list_dict_author, cursorInstance)
     # connectionInstance.close()
 
     # print(data_frame_author.head())
