@@ -13,6 +13,7 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import re
+import datetime
 import pymysql
 
 SCROLL_PAUSE_TIME = 2
@@ -47,7 +48,11 @@ connectionInstance = pymysql.connect(host=databaseServerIP, user=databaseUserNam
 
 def export_data_topic(link):
     """
-    Export Toward_Data_Science
+    This function gets the links to the five "data science" themed topics that are available on the towardsdatascience
+    homepage. The input is a link to the towardsdatascience homepage and the output is a dictionary containing the names
+    of each topic and their corresponding links.
+    :param link: string
+    :return: topic: list
     """
     html = requests.get(link)
     topic = {}
@@ -58,6 +63,12 @@ def export_data_topic(link):
 
 
 def browser_scroll(browser):
+    """
+    This function defines automated browsing through the desired web page which allows for the access to raw html that
+    is only available through scrolling.
+    :param browser: browser object
+    :return: Beautiful Soup object
+    """
     last_height = browser.execute_script("return document.body.scrollHeight")
     while True:
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -69,34 +80,16 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
-def export_sql_articles(link_dict):
+def export_sql_articles(link_dict, cur):
+    """
+    This function creates an articles datatable which contains the following information about an article:
+    Title, Subtitle, Page, Author, Date, Read_time, is_Premium, Link_Author, Link_Article.
+    The function takes a dictionary of topic links, iterates through the dictionary to extract raw html from each topic
+    page (using the previously defined browser) and extracts the exact information to populate the dataframe.
+    :param link_dict: dictionary, cur: cursor instance
+    :return: data_frame: nothing
+    """
     try:
-        cursorInstance = connectionInstance.cursor()
-        sqlStatement = "CREATE DATABASE " + newDatabaseName
-        cursorInstance.execute(sqlStatement)
-        databaseList = cursorInstance.fetchall()
-        cursorInstance.execute('''CREATE TABLE TowardDataScience.authors (
-                            id_author INT,
-                            name CHAR,
-                            member_since DATETIME,
-                            description CHAR,
-                            following INT,
-                            followers INT,
-                            social_media BIT,
-                            PRIMARY KEY (id_author))''')
-        cursorInstance.execute('''CREATE TABLE TowardDataScience.articles (
-                            id_article INT,
-                            title CHAR,
-                            subtitle CHAR,
-                            page CHAR,
-                            id_author CHAR,
-                            date CHAR,
-                            read_time CHAR,
-                            is_Premium CHAR,
-                            link_author CHAR,
-                            link_article CHAR,
-                            PRIMARY KEY (id_article))''') #,
-                            #FOREIGN KEY (id_author) REFERENCES TowardDataScience.authors(id_author))''')
         topic_list = []
         link_list_topic = []
         for topic, link in link_dict.items():
@@ -115,43 +108,131 @@ def export_sql_articles(link_dict):
                     sub_author = sub.findAll(BALISE_A)[0]
                     sub_time = sub.findAll('time')[0]
                     sub_min = sub.findAll(class_='readingTime')[0]
-                    try:
-                        sub_premium = True if sub.findAll(class_='svgIcon-use')[0] != '' else ''
-                    except:
-                        sub_premium = False
-                    cursorInstance.execute("INSERT INTO TowardDataScience.articles (id_article ,title ,subtitle ,\
-                    page , id_author , date , read_time , is_Premium , link_author ,link_article) \
-                                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                           # [0,'title','sub','page',1,'123','1',1,'bb','bx'])
-                                           [int(row),
-                                            str(soup2.findAll(class_=TITLE_CLASS)[j].text),
-                                            str(soup2.findAll(class_=SUB_TITLE_CLASS)[j].text),
-                                            str(sub_author.text),
-                                            str(topic_list[i]),
-
-                                            str(sub_time['datetime']),
-                                            str(sub_min['title']),
-                                            str(sub_premium),
-                                            str(sub_author[BALISE_HREF]),
-                                            str(sub_link_article['data-action-value'])])
+                    date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                    if len(sub.findAll(class_='svgIcon-use')) != 0:
+                        sub_premium = 1
+                    else:
+                        sub_premium = 0
+                    mySql_insert_query = """INSERT INTO TowardDataScience.articles (id_article ,title ,subtitle ,\
+                     author, page , date , read_time , is_Premium , link_author ,link_article) \
+                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                    recordTuple = (int(row),
+                                   soup2.findAll(class_=TITLE_CLASS)[j].text,
+                                   soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
+                                   str(sub_author.text),
+                                   str(topic_list[i]),
+                                   date_format.isoformat(),
+                                   int(sub_min['title'].split(' ')[0]),
+                                   sub_premium,
+                                   str(sub_author[BALISE_HREF]),
+                                   str(sub_link_article['data-action-value']))
+                    cur.execute(mySql_insert_query, recordTuple)
+                    if row % 100 == 0:
+                        connectionInstance.commit()
                     row += 1
                     print(row)
-                    connectionInstance.commit()
                 except:
                     pass
+            connectionInstance.commit()
     except Exception as e:
         print("Exception occured:{}".format(e))
-    finally:
-        connectionInstance.close()
+
+# def export_authors(author_link, curr):
+#     """
+#     This function creates an author dataframe which contains the following information about each author of an article
+#     in the article dataframe:
+#     Name, Member_Since, Description, Following, Followers, Social_Media.
+#     The function takes a dataframe of articles as its input and iterates through each "Link_Author" in the dataframe,
+#     extracts raw html from each author page, and extracts exact information to populate the dataframe.
+#     :param data_frame_article: dataframe
+#     :return: author: dataframe
+#     """
+#     author = {'Name': [], 'Member_Since': [], 'Description': [], 'Following': [], 'Followers': [], 'Social_Media': []}
+#     author = pd.DataFrame(data=author)
+#     row = 0
+#     for i in range(len(author_link)):
+#         html = requests.get(data_frame_article.iloc[i, 7])
+#         soup_extraction = BeautifulSoup(html.text, 'html.parser')
+#         name_author = soup_extraction.findAll('h1')[0].text
+#         try:
+#             member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
+#         except:
+#             member_since = 'NULL'
+#         try:
+#             desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
+#         except:
+#             desc_author = 'NULL'
+#
+#         info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
+#
+#         try:
+#             test = info_author_plus.findAll('a')[2]['aria-label']
+#             social_media = True
+#         except:
+#             social_media = False
+#
+#         try:
+#             following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
+#         except:
+#             following_author = 'NULL'
+#
+#         try:
+#             follower_author = info_author_plus.findAll('a')[1]['aria-label'].split(' ')[1]
+#         except:
+#             follower_author = 'NULL'
+#
+#         author.loc[row, 'Name'] = name_author
+#         author.loc[row, 'Member_Since'] = member_since[19:]
+#         author.loc[row, 'Description'] = desc_author
+#         author.loc[row, 'Following'] = following_author
+#         author.loc[row, 'Followers'] = follower_author
+#         author.loc[row, 'Social_Media'] = social_media
+#         row += 1
+#     return author
+
 
 def main():
     print('Each step could take time, so no worry')
     print('Extract Topics')
     topic_link_dict = export_data_topic(LINK)
+    print('Create Database')
+    cursorInstance = connectionInstance.cursor()
+    sqlStatement = "CREATE DATABASE " + newDatabaseName
+    cursorInstance.execute(sqlStatement)
+    cursorInstance.fetchall()
+    cursorInstance.execute('''CREATE TABLE TowardDataScience.articles (
+                        id_article INT,
+                        title TEXT ,
+                        subtitle TEXT ,
+                        author TEXT,
+                        page TEXT,
+                        date TEXT,
+                        read_time INT,
+                        is_Premium TINYINT(1),
+                        link_author TEXT,
+                        link_article TEXT,
+                        PRIMARY KEY (id_article))''')
+    cursorInstance.execute('''CREATE TABLE TowardDataScience.authors (
+                        id INT,
+                        name TEXT,
+                        member_since DATETIME,
+                        description TEXT,
+                        following INT,
+                        followers INT,
+                        social_media TINYINT(1),
+                        PRIMARY KEY (id),
+                        FOREIGN KEY (id) REFERENCES TowardDataScience.articles(id_article))''')
     print('Extract Articles')
-    data_frame_article = export_sql_articles(topic_link_dict)
-    # print('Extract Authors')
-    # data_frame_author = export_authors(data_frame_article)
+    export_sql_articles(topic_link_dict, cursorInstance)
+    print('Extract Authors')
+    link_author = []
+    cursorInstance.execute('''SELECT link_author FROM TowardDataScience.articles''')
+    list_dict_author = cursorInstance.fetchall()
+    for dict_author in list_dict_author:
+        link_author.append(dict_author['link_author'])
+    data_frame_author = export_authors(list_dict_author, cursorInstance)
+    # connectionInstance.close()
+
     # print(data_frame_author.head())
     # print('Extract Articles Details')
     # data_frame_articles_detail = export_articles_details(data_frame_article)
