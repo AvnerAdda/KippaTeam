@@ -3,6 +3,10 @@ Project of data-mining on Towards Data Science
 By : KippaTeam
 """
 
+
+# C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe redboxb,b500 nathan_db
+
+
 from bs4 import BeautifulSoup as bs, BeautifulSoup
 import requests
 import urllib.request
@@ -16,35 +20,6 @@ import re
 import datetime
 import pymysql
 import config
-
-# SCROLL_PAUSE_TIME = 2
-# LINK = "https://towardsdatascience.com/"
-# ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
-# TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
-# SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
-
-DRIVER = 'C:/Users/Nathan/Desktop/chromedriver_win32/chromedriver.exe' # cli
-
-# LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
-# LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
-# BALISE_A = 'a'
-# BALISE_HREF = 'href'
-#
-# AUTHOR_NAME = 'ui-h2 hero-title'
-# MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
-# DESCRIPTION = 'ui-body hero-description'
-# FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
-# AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
-
-# Create a connection object
-# databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
-# databaseUserName = "root"  # User name of the database server
-databaseUserPassword = "redboxb,b500"  # Password for the database user --------cli
-newDatabaseName = "TowardDataScience"  # Name of the database that is to be created   -------cli
-# charSet = "utf8mb4"  # Character set
-cursorType = pymysql.cursors.DictCursor
-connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName, password=databaseUserPassword,
-                                     charset=config.charSet, cursorclass=cursorType)
 
 
 def export_data_topic(link):
@@ -81,13 +56,15 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
-def export_sql_articles(link_dict, cur):
+def export_sql_articles(link_dict, cur, driver, connectionInstance):
     """
     This function creates an articles datatable which contains the following information about an article:
     Title, Subtitle, Page, Author, Date, Read_time, is_Premium, Link_Author, Link_Article.
     The function takes a dictionary of topic links, iterates through the dictionary to extract raw html from each topic
     page (using the previously defined browser) and extracts the exact information to populate the dataframe.
     :param link_dict: dictionary, cur: cursor instance
+    :param cur
+    :param driver
     :return: data_frame: nothing
     """
     try:
@@ -97,7 +74,7 @@ def export_sql_articles(link_dict, cur):
             topic_list.append(topic)
             link_list_topic.append(link)
         row = 0
-        browser = webdriver.Chrome(DRIVER)
+        browser = webdriver.Chrome(driver)
         for i in range(len(topic_list)):
             browser.get(link_list_topic[i])
             soup2 = browser_scroll(browser)
@@ -139,13 +116,13 @@ def export_sql_articles(link_dict, cur):
         print("Exception occured:{}".format(e))
 
 
-def main():
+def sql_creator(connectionInstance, driver, db_name):
     print('Each step could take time, so no worry')
     print('Extract Topics')
     topic_link_dict = export_data_topic(config.LINK)
     print('Create Database')
     cursorInstance = connectionInstance.cursor()
-    sqlStatement = "CREATE DATABASE " + newDatabaseName
+    sqlStatement = "CREATE DATABASE " + db_name
     cursorInstance.execute(sqlStatement)
     cursorInstance.fetchall()
     cursorInstance.execute('''CREATE TABLE TowardDataScience.articles (
@@ -171,20 +148,25 @@ def main():
                         PRIMARY KEY (id),
                         FOREIGN KEY (id) REFERENCES TowardDataScience.articles(id_article))''')
     print('Extract Articles')
-    export_sql_articles(topic_link_dict, cursorInstance)
+    export_sql_articles(topic_link_dict, cursorInstance, driver, connectionInstance)
     print('Extract Authors')
     link_author = []
     cursorInstance.execute('''SELECT link_author FROM TowardDataScience.articles''')
     list_dict_author = cursorInstance.fetchall()
     for dict_author in list_dict_author:
         link_author.append(dict_author['link_author'])
-    # data_frame_author = export_authors(list_dict_author, cursorInstance)
-    # connectionInstance.close()
 
-    # print(data_frame_author.head())
-    # print('Extract Articles Details')
-    # data_frame_articles_detail = export_articles_details(data_frame_article)
-    # print(data_frame_articles_detail.head())
+
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("driver_path", help="path to the chrome driver", type=str)
+    parser.add_argument("password", help="password for mysql server", type=str)
+    args = parser.parse_args()
+    cursorType = pymysql.cursors.DictCursor
+    connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
+                                         password=args.password, charset=config.charSet, cursorclass=cursorType)
+    sql_creator(connectionInstance, args.driver_path, config.DB_NAME)
 
 
 if __name__ == '__main__':

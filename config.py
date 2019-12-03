@@ -16,3 +16,4 @@ AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
 databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
 databaseUserName = "root"  # User name of the database server
 charSet = "utf8mb4"  # Character set
+DB_NAME = "TowardDataScience"  # Name of the database that is to be created
