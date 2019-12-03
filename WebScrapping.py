@@ -2,31 +2,48 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
-import csv
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as bs, BeautifulSoup
 import requests
+import urllib.request
 import os
+import argparse
 import pandas as pd
 import time
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 import re
+import datetime
+import pymysql
 
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
 ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
 TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
 SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
-DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"  # To change
+
+DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"
+
 LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
 LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
 BALISE_A = 'a'
 BALISE_HREF = 'href'
+
 AUTHOR_NAME = 'ui-h2 hero-title'
 MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
 DESCRIPTION = 'ui-body hero-description'
 FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
 AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
+
+# Create a connection object
+databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
+databaseUserName = "root"  # User name of the database server
+databaseUserPassword = "avner"  # Password for the database user
+newDatabaseName = "Toward_DataScience"  # Name of the database that is to be created
+charSet = "utf8mb4"  # Character set
+cursorType = pymysql.cursors.DictCursor
+connectionInstance = pymysql.connect(host=databaseServerIP, user=databaseUserName, password=databaseUserPassword,
+                                     charset=charSet, cursorclass=cursorType)
 
 
 def export_data_topic(link):
@@ -63,58 +80,70 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
-def export_articles(link_dict):
+def export_articles(link_dict, cur):
     """
-    This function creates an articles dataframe which contains the following information about an article:
+    This function creates an articles datatable which contains the following information about an article:
     Title, Subtitle, Page, Author, Date, Read_time, is_Premium, Link_Author, Link_Article.
     The function takes a dictionary of topic links, iterates through the dictionary to extract raw html from each topic
     page (using the previously defined browser) and extracts the exact information to populate the dataframe.
-    :param link_dict: dictionary
-    :return: data_frame: dataframe
+    :param link_dict: dictionary, cur: cursor instance
+    :return: data_frame: nothing
     """
-    topic_list = []
-    link_list_topic = []
-    for topic, link in link_dict.items():
-        topic_list.append(topic)
-        link_list_topic.append(link)
-    data_frame = {'Title': [], 'Subtitle': [], 'Page': [], 'Author': [], 'Date': [],
-                  'Read_time': [], 'is_Premium': [], 'Link_Author': [], 'Link_Article': []}
-    data_frame = pd.DataFrame(data=data_frame)
-    row = 0
-    browser = webdriver.Chrome(DRIVER)
-    for i in range(len(topic_list)):
-        browser.get(link_list_topic[i])
-        soup2 = browser_scroll(browser)
-        for j in range(50):
-            try:
-                sub = soup2.findAll(class_=ARTICLE_CLASS)[j]
-
-                sub2 = soup2.findAll(class_=LINK_ARTICLE_LINK)[j]
-                sub_link_article = sub2.findAll('a')[0]
-
-                sub_author = sub.findAll(BALISE_A)[0]
-                sub_time = sub.findAll('time')[0]
-                sub_min = sub.findAll(class_='readingTime')[0]
+    try:
+        topic_list = []
+        link_list_topic = []
+        dict_author = {}
+        dict_article = {}
+        for topic, link in link_dict.items():
+            topic_list.append(topic)
+            link_list_topic.append(link)
+        row = 1
+        id_author = 1
+        browser = webdriver.Chrome(DRIVER)
+        for i in range(len(topic_list)):
+            browser.get(link_list_topic[i])
+            soup2 = browser_scroll(browser)
+            for j in range(50):
                 try:
-                    sub_premium = True if sub.findAll(class_='svgIcon-use')[0] != '' else ''
+                    sub = soup2.findAll(class_=ARTICLE_CLASS)[j]
+                    sub2 = soup2.findAll(class_=LINK_ARTICLE_LINK)[j]
+                    sub_author = sub.findAll(BALISE_A)[0]
+                    sub_time = sub.findAll('time')[0]
+                    sub_min = sub.findAll(class_='readingTime')[0]
+                    date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                    if len(sub.findAll(class_='svgIcon-use')) != 0:
+                        sub_premium = 1
+                    else:
+                        sub_premium = 0
+                    if sub_author.text not in dict_author.keys():
+                        dict_author[sub_author.text] = [id_author, sub_author[BALISE_HREF]]
+                        id_author += 1
+                    dict_article[row] = sub_author[BALISE_HREF]
+                    mySql_insert_query = """INSERT INTO Toward_DataScience.articles (id_article ,title ,subtitle ,\
+                     id_author, page , date , read_time , is_Premium) \
+                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                    recordTuple = (int(row),
+                                   soup2.findAll(class_=TITLE_CLASS)[j].text,
+                                   soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
+                                   dict_author[sub_author.text][0],
+                                   str(topic_list[i]),
+                                   date_format.isoformat(),
+                                   int(sub_min['title'].split(' ')[0]),
+                                   sub_premium)
+                    cur.execute(mySql_insert_query, recordTuple)
+                    row += 1
+                    if row % 100 == 0:
+                        connectionInstance.commit()
+                    print(row)
                 except:
-                    sub_premium = False
-                data_frame.loc[row, 'Title'] = soup2.findAll(class_=TITLE_CLASS)[j].text
-                data_frame.loc[row, 'Subtitle'] = soup2.findAll(class_=SUB_TITLE_CLASS)[j].text
-                data_frame.loc[row, 'Author'] = sub_author.text
-                data_frame.loc[row, 'Page'] = topic_list[i]
-                data_frame.loc[row, 'Date'] = sub_time['datetime']
-                data_frame.loc[row, 'Read_time'] = sub_min['title']
-                data_frame.loc[row, 'is_Premium'] = sub_premium
-                data_frame.loc[row, 'Link_Author'] = sub_author[BALISE_HREF]
-                data_frame.loc[row, 'Link_Article'] = sub_link_article['data-action-value']
-                row += 1
-            except:
-                pass
-    return data_frame
+                    pass
+        connectionInstance.commit()
+        return dict_author, dict_article
+    except Exception as e:
+        print("Exception occured:{}".format(e))
 
 
-def export_authors(data_frame_article):
+def export_authors(dict_author, curr):
     """
     This function creates an author dataframe which contains the following information about each author of an article
     in the article dataframe:
@@ -124,116 +153,121 @@ def export_authors(data_frame_article):
     :param data_frame_article: dataframe
     :return: author: dataframe
     """
-    author = {'Name': [], 'Member_Since': [], 'Description': [], 'Following': [], 'Followers': [], 'Social_Media': []}
-    author = pd.DataFrame(data=author)
-    row = 0
-    for i in range(len(data_frame_article['Link_Author'])):
-        html = requests.get(data_frame_article.iloc[i, 7])
-        soup_extraction = BeautifulSoup(html.text, 'html.parser')
-        name_author = soup_extraction.findAll('h1')[0].text
+    row = 1
+    for key, value in dict_author.items():
+        print(key)
         try:
-            member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
-        except:
-            member_since = 'NULL'
-        try:
-            desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
-        except:
-            desc_author = 'NULL'
+            html = requests.get(value[1])
+            soup_extraction = BeautifulSoup(html.text, 'html.parser')
+            name_author = soup_extraction.findAll('h1')[0].text
+            try:
+                member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
+                member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
+            except:
+                member_since = ''
+            try:
+                desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
+            except:
+                desc_author = ''
 
-        info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
+            info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
 
-        try:
-            test = info_author_plus.findAll('a')[2]['aria-label']
-            social_media = True
-        except:
-            social_media = False
+            try:
+                test = info_author_plus.findAll('a')[2]['aria-label']
+                social_media = True
+            except:
+                social_media = False
 
-        try:
-            following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
-        except:
-            following_author = 'NULL'
+            try:
+                following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
+            except:
+                following_author = ''
 
-        try:
-            follower_author = info_author_plus.findAll('a')[1]['aria-label'].split(' ')[1]
-        except:
-            follower_author = 'NULL'
+            try:
+                follower_author = info_author_plus.findAll(
+                    'a')[1]['aria-label'].split(' ')[1]
+            except:
+                follower_author = ''
 
-        author.loc[row, 'Name'] = name_author
-        author.loc[row, 'Member_Since'] = member_since[19:]
-        author.loc[row, 'Description'] = desc_author
-        author.loc[row, 'Following'] = following_author
-        author.loc[row, 'Followers'] = follower_author
-        author.loc[row, 'Social_Media'] = social_media
-        row += 1
-    return author
+            mySql_insert_query = """INSERT INTO Toward_DataScience.authors (id ,name ,member_since ,\
+                         description, following , followers , social_media) \
+                                                        VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+            recordTuple = (value[0], name_author, member_since, desc_author,
+                           following_author.replace(',', ''), follower_author.replace(',', ''), social_media)
+            curr.execute(mySql_insert_query, recordTuple)
+            row += 1
+            curr.fetchone()
+            if row % 100 == 0:
+                connectionInstance.commit()
+        except Exception as e:
+            print("Exception occured:{}".format(e))
+    connectionInstance.commit()
 
 
-def export_articles_details(data_frame_article):
+def export_articles_details(dict_article, curr):
     """
     This function import more details about the articles of the first dataframe. We have the Title as the key, we have
     the number of claps (as like for facebook) and the different tags on the article>
     :param data_frame_article: the first dataframe
     :return: the dataframe of hte detail of each article
     """
-    details_articles = {'Title': [], 'Claps': [], 'Tags': []}
-    details_articles = pd.DataFrame(data=details_articles)
-    row = 0
-    for i in range(len(data_frame_article['Link_Article'])):
-        html = requests.get(data_frame_article.iloc[i, 8])
+    curr.execute("""ALTER TABLE Toward_DataScience.articles 
+                        ADD COLUMN claps INT NOT NULL AFTER `is_Premium`,
+                        ADD COLUMN tags TEXT NOT NULL AFTER `claps`;""")
+    for key, value in dict_article.items():
+        html = requests.get(value)
         soup_extraction = BeautifulSoup(html.text, 'html.parser')
         text = soup_extraction.text
-        clap = re.search(r"(?<=clapCount\"\:)([0-9]+)", text)[0]
-        tags = '; '.join(re.findall(r"(?<=\"\,\"Tag\:).*?(?=\"\,)", text))
-        details_articles.loc[row, 'Title'] = data_frame_article.iloc[i, 0]
-        details_articles.loc[row, 'Claps'] = clap
-        details_articles.loc[row, 'Tags'] = tags
-        row += 1
-    return details_articles
+        clap = re.search(r"(?<=ClapCount\"\:)([0-9]+)", text)[0]
+        tags = '; '.join(re.findall(r"(?<=\"\,\"name\"\:\").*?(?=\"\,)", text)[1:])
+        mySql_update_query = """UPDATE Toward_DataScience.articles SET claps=%s, tags=%s WHERE id_article=%s;"""
+        recordTuple = (clap, tags, key)
+        curr.execute(mySql_update_query, recordTuple)
+        curr.fetchone()
+        if key % 100 == 0:
+            connectionInstance.commit()
+    connectionInstance.commit()
 
 
-def compare_two_file(file1, file2):
-    """
-    Compare 2 files (this function could permit to see how many data could we have by day)
-    The files must be csv
-    """
-    with open(file1, encoding="utf-8") as t1, open(file2, encoding="utf-8") as t2:
-        file_one = csv.reader(t1, delimiter=',')
-        file_two = csv.reader(t2, delimiter=',')
-        title1 = []
-        title2 = []
-        for line in file_two:
-            title1.append(line[0])
-        for line in file_one:
-            title2.append(line[0])
-        diff_doc1 = 0
-        for i in title1:
-            if i not in title2:
-                diff_doc1 += 1
-        print('There is ' + str(diff_doc1) + ' differences between these 2 versions.')
-
-
-def export_csv(data_frame):
-    """
-    Export to csv the files
-    """
-    file_name = os.getcwd() + '\\TDS_' + time.strftime("%d_%b_%Y_%H%M", time.gmtime()) + '.csv'
-    data_frame.to_csv(file_name, index=None, header=True)
-
-
-def main():
-    print('Each step could take time, so no worry')
-    print('Extract Topics')
-    topic_link_dict = export_data_topic(LINK)
-    print('Extract Articles')
-    data_frame_article = export_articles(topic_link_dict)
-    print(data_frame_article.head())
-    print('Extract Authors')
-    data_frame_author = export_authors(data_frame_article)
-    print(data_frame_author.head())
-    print('Extract Articles Details')
-    data_frame_articles_detail = export_articles_details(data_frame_article)
-    print(data_frame_articles_detail.head())
+def database_definition(cursorInstance):
+    try:
+        sqlStatement = "CREATE DATABASE " + newDatabaseName
+        cursorInstance.execute(sqlStatement)
+        cursorInstance.fetchall()
+        cursorInstance.execute('''CREATE TABLE Toward_DataScience.authors (
+                            id INT NOT NULL,
+                            name TEXT,
+                            member_since TEXT,
+                            description TEXT,
+                            following INT,
+                            followers INT,
+                            social_media TINYINT(1),
+                            PRIMARY KEY (id))''')
+        cursorInstance.execute('''CREATE TABLE Toward_DataScience.articles (
+                            id_article INT NOT NULL,
+                            title TEXT ,
+                            subtitle TEXT ,
+                            id_author INT NOT NULL,
+                            page TEXT,
+                            date DATE,
+                            read_time INT,
+                            is_Premium TINYINT(1),
+                            PRIMARY KEY (id_article))''')
+    except Exception as e:
+        print("Exception occured:{}".format(e))
 
 
 if __name__ == '__main__':
-    main()
+    print('Each step could take time, so no worry')
+    print('Extract Topics')
+    topic_link_dict = export_data_topic(LINK)
+    print('Create Database')
+    cursorInstance = connectionInstance.cursor()
+    database_definition(cursorInstance)
+    print('Extract Articles')
+    dict_author, dict_article = export_articles(topic_link_dict, cursorInstance)
+    print('Extract Authors')
+    export_authors(dict_author, cursorInstance)
+    print('Extract Articles Details')
+    export_articles_details(dict_article, cursorInstance)
+    connectionInstance.close()
