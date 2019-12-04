@@ -2,17 +2,17 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
-import argparse
 
-from bs4 import BeautifulSoup as bs, BeautifulSoup
-import requests
-import time
-from selenium import webdriver
-import re
-import datetime
-import pymysql
-from tqdm import tqdm
+import argparse
 import config
+import datetime
+import re
+import time
+import pymysql
+import requests
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from tqdm import tqdm
 
 
 def export_data_topic(link):
@@ -50,6 +50,18 @@ def browser_scroll(browser):
 
 
 def insert_mysql_article(id_article, title, subtitle, id_author, page, date, read_time, is_premium, curr):
+    """
+    This function takes in article information from the web scraper and creates article entries in the database
+    :param id_article: int
+    :param title: string
+    :param subtitle: string
+    :param id_author: int
+    :param page: string
+    :param date: datetime
+    :param read_time: int
+    :param is_premium: boolean
+    :param curr: cursor
+    """
     mySql_insert_query = """INSERT INTO Toward_DataScience.articles (id_article ,title ,subtitle ,\
      id_author, page , date , read_time , is_Premium) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
     recordTuple = (id_article, title, subtitle, id_author, page, date, read_time, is_premium)
@@ -57,6 +69,13 @@ def insert_mysql_article(id_article, title, subtitle, id_author, page, date, rea
 
 
 def if_exist_article(curr, title, author):
+    """
+    This function is used to determine if an article already exists in the database.
+    :param curr: cursor
+    :param title: string
+    :param author: string
+    :return: not None/None
+    """
     curr.execute("""SELECT DISTINCT title 
     FROM toward_datascience.articles 
     WHERE toward_datascience.articles.title = %s and toward_datascience.articles.id_author = %s""", (title, author))
@@ -70,7 +89,7 @@ def export_articles(link_dict, cur, path):
     The function takes a dictionary of topic links, iterates through the dictionary to extract raw html from each topic
     page (using the previously defined browser) and extracts the exact information to populate the dataframe.
     :param link_dict: dictionary, cur: cursor instance
-    :return: data_frame: nothing
+    :return: data_frame: dict_author, dict_article
     """
     try:
         topic_list = []
@@ -96,7 +115,7 @@ def export_articles(link_dict, cur, path):
                         dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
                         id_author += 1
                     id_author_name = dict_author[sub_author.text][0]
-                    if if_exist_article(cur, title) is None:
+                    if if_exist_article(cur, title, id_author_name) is None:
                         sub_time = sub.findAll('time')[0]
                         sub_min = sub.findAll(class_='readingTime')[0]
                         date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
@@ -125,6 +144,11 @@ def export_articles(link_dict, cur, path):
 
 
 def max_id_sql(curr):
+    """
+    This function finds the most max id of table. The max id will represent the most recently inserted row in the table
+    :param curr: cursor
+    :return: id: int
+    """
     try:
         curr.execute("""SELECT TABLE_ROWS
         FROM information_schema.tables
@@ -137,6 +161,17 @@ def max_id_sql(curr):
 
 
 def insert_mysql_author(id, name, member_since, description, following, followers, social_media, curr):
+    """
+    This function takes in author information from the web scraper and creates author entries in the database
+    :param id: int
+    :param name: string
+    :param member_since: datetime
+    :param description: string
+    :param following: int
+    :param followers: int
+    :param social_media: boolean
+    :param curr: cursor
+    """
     mySql_insert_query = """INSERT INTO Toward_DataScience.authors (id ,name ,member_since ,\
                  description, following , followers , social_media) \
                                                 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
@@ -145,6 +180,12 @@ def insert_mysql_author(id, name, member_since, description, following, follower
 
 
 def if_exist_author(curr, name):
+    """
+    This function is used to determine if an author already exists in the database.
+    :param curr: cursor
+    :param name: string
+    :return: not None/None
+    """
     curr.execute("""SELECT DISTINCT toward_datascience.authors.name 
     FROM toward_datascience.authors 
     WHERE toward_datascience.authors.name = %s""", name)
@@ -231,6 +272,10 @@ def export_articles_details(dict_article, curr):
 
 
 def database_definition(cursorInstance):
+    """
+    This function defines the database tables and their columns
+    :param cursorInstance: 
+    """
     try:
         sqlStatement = "CREATE DATABASE " + config.DB_NAME
         cursorInstance.execute(sqlStatement)
@@ -283,3 +328,4 @@ if __name__ == '__main__':
     print('Extract Articles Details')
     export_articles_details(dict_article, cursorInstance)
     connectionInstance.close()
+
