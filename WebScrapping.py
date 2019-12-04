@@ -15,6 +15,8 @@ from selenium.webdriver.common.keys import Keys
 import re
 import datetime
 import pymysql
+from tqdm import tqdm
+
 
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
@@ -57,7 +59,7 @@ def export_data_topic(link):
     html = requests.get(link)
     topic = {}
     soup_extraction = BeautifulSoup(html.text, 'html.parser')
-    for i in range(0, len(soup_extraction.findAll('li')) - 3):
+    for i in tqdm(range(0, len(soup_extraction.findAll('li')) - 3)):
         topic[soup_extraction.findAll('li')[i].text] = soup_extraction.findAll('li')[i].findAll('a')[0]['href']
     return topic
 
@@ -80,6 +82,13 @@ def browser_scroll(browser):
     return BeautifulSoup(browser.page_source, "html.parser")
 
 
+def insert_mysql_article(id_article, title, subtitle, id_author, page, date, read_time, is_premium, curr):
+    mySql_insert_query = """INSERT INTO Toward_DataScience.articles (id_article ,title ,subtitle ,\
+     id_author, page , date , read_time , is_Premium) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+    recordTuple = (id_article, title, subtitle, id_author, page, date, read_time, is_premium)
+    curr.execute(mySql_insert_query, recordTuple)
+
+
 def export_articles(link_dict, cur):
     """
     This function creates an articles datatable which contains the following information about an article:
@@ -100,7 +109,7 @@ def export_articles(link_dict, cur):
         row = 1
         id_author = 1
         browser = webdriver.Chrome(DRIVER)
-        for i in range(len(topic_list)):
+        for i in tqdm(range(len(topic_list))):
             browser.get(link_list_topic[i])
             soup2 = browser_scroll(browser)
             for j in range(50):
@@ -119,28 +128,43 @@ def export_articles(link_dict, cur):
                         dict_author[sub_author.text] = [id_author, sub_author[BALISE_HREF]]
                         id_author += 1
                     dict_article[row] = sub_author[BALISE_HREF]
-                    mySql_insert_query = """INSERT INTO Toward_DataScience.articles (id_article ,title ,subtitle ,\
-                     id_author, page , date , read_time , is_Premium) \
-                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-                    recordTuple = (int(row),
-                                   soup2.findAll(class_=TITLE_CLASS)[j].text,
-                                   soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
-                                   dict_author[sub_author.text][0],
-                                   str(topic_list[i]),
-                                   date_format.isoformat(),
-                                   int(sub_min['title'].split(' ')[0]),
-                                   sub_premium)
-                    cur.execute(mySql_insert_query, recordTuple)
+                    insert_mysql_article(int(row),
+                                         soup2.findAll(class_=TITLE_CLASS)[j].text,
+                                         soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
+                                         dict_author[sub_author.text][0],
+                                         str(topic_list[i]),
+                                         date_format.isoformat(),
+                                         int(sub_min['title'].split(' ')[0]),
+                                         sub_premium, cur)
                     row += 1
                     if row % 100 == 0:
                         connectionInstance.commit()
-                    print(row)
                 except:
                     pass
         connectionInstance.commit()
         return dict_author, dict_article
     except Exception as e:
         print("Exception occured:{}".format(e))
+
+
+def max_id_sql(curr, data):
+    try:
+        table = 'toward_datascience.' + data
+        mySql_select_max_query = """SELECT MAX(id_article) as max FROM %s """
+        recordTuple = table
+        curr.execute(mySql_select_max_query, recordTuple)
+        result = curr.fetchone()
+        return result['max']
+    except:
+        return 0
+
+
+def insert_mysql_author(id, name, member_since, description, following, followers, social_media, curr):
+    mySql_insert_query = """INSERT INTO Toward_DataScience.authors (id ,name ,member_since ,\
+                 description, following , followers , social_media) \
+                                                VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+    recordTuple = (id, name, member_since, description, following, followers, social_media)
+    curr.execute(mySql_insert_query, recordTuple)
 
 
 def export_authors(dict_author, curr):
@@ -153,48 +177,41 @@ def export_authors(dict_author, curr):
     :param data_frame_article: dataframe
     :return: author: dataframe
     """
-    row = 1
-    for key, value in dict_author.items():
-        print(key)
+    row = max_id_sql(curr, 'author') + 1
+    for key, value in tqdm(dict_author.items()):
         try:
             html = requests.get(value[1])
             soup_extraction = BeautifulSoup(html.text, 'html.parser')
             name_author = soup_extraction.findAll('h1')[0].text
-            try:
+            member_since = None
+            if len(soup_extraction.findAll(class_=MEMBERSHIP)) != 0:
                 member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
                 member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
-            except:
-                member_since = ''
-            try:
+
+            if len(soup_extraction.findAll(class_=DESCRIPTION)) != 0 :
                 desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
-            except:
+            else:
                 desc_author = ''
 
             info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
-
-            try:
-                test = info_author_plus.findAll('a')[2]['aria-label']
+            if len(info_author_plus.findAll('a')) >= 2:
                 social_media = True
-            except:
+            else:
                 social_media = False
 
-            try:
+            if len(info_author_plus.findAll('a')) >= 2:
                 following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
-            except:
-                following_author = ''
+            else:
+                following_author = 0
 
-            try:
+            if len(info_author_plus.findAll('a')) >= 2:
                 follower_author = info_author_plus.findAll(
                     'a')[1]['aria-label'].split(' ')[1]
-            except:
-                follower_author = ''
+            else:
+                follower_author = 0
 
-            mySql_insert_query = """INSERT INTO Toward_DataScience.authors (id ,name ,member_since ,\
-                         description, following , followers , social_media) \
-                                                        VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-            recordTuple = (value[0], name_author, member_since, desc_author,
-                           following_author.replace(',', ''), follower_author.replace(',', ''), social_media)
-            curr.execute(mySql_insert_query, recordTuple)
+            insert_mysql_author(value[0], name_author, member_since, desc_author,
+                                int(str(following_author).replace(',', '')), int(str(follower_author).replace(',', '')), social_media, curr)
             row += 1
             curr.fetchone()
             if row % 100 == 0:
@@ -214,7 +231,7 @@ def export_articles_details(dict_article, curr):
     curr.execute("""ALTER TABLE Toward_DataScience.articles 
                         ADD COLUMN claps INT NOT NULL AFTER `is_Premium`,
                         ADD COLUMN tags TEXT NOT NULL AFTER `claps`;""")
-    for key, value in dict_article.items():
+    for key, value in tqdm(dict_article.items()):
         html = requests.get(value)
         soup_extraction = BeautifulSoup(html.text, 'html.parser')
         text = soup_extraction.text
@@ -249,7 +266,7 @@ def database_definition(cursorInstance):
                             subtitle TEXT ,
                             id_author INT NOT NULL,
                             page TEXT,
-                            date DATE,
+                            date DATETIME NULL DEFAULT NULL,
                             read_time INT,
                             is_Premium TINYINT(1),
                             PRIMARY KEY (id_article))''')
