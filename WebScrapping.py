@@ -2,50 +2,17 @@
 Project of data-mining on Towards Data Science
 By : KippaTeam
 """
+import argparse
 
 from bs4 import BeautifulSoup as bs, BeautifulSoup
 import requests
-import urllib.request
-import os
-import argparse
-import pandas as pd
 import time
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 import re
 import datetime
 import pymysql
 from tqdm import tqdm
-
-
-SCROLL_PAUSE_TIME = 2
-LINK = "https://towardsdatascience.com/"
-ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
-TITLE_CLASS = 'u-letterSpacingTight u-lineHeightTighter u-breakWord u-textOverflowEllipsis u-lineClamp3 u-fontSize24'
-SUB_TITLE_CLASS = 'u-fontSize18 u-letterSpacingTight u-lineHeightTight u-marginTop7 u-textColorNormal u-baseColor--textNormal'
-
-DRIVER = "C:/Users/avner/Downloads/chromedriver_win32/chromedriver.exe"
-
-LINK_ARTICLE = 'col u-xs-marginBottom10 u-paddingLeft0 u-paddingRight0 u-paddingTop15 u-marginBottom30'
-LINK_ARTICLE_LINK = 'u-lineHeightBase postItem'
-BALISE_A = 'a'
-BALISE_HREF = 'href'
-
-AUTHOR_NAME = 'ui-h2 hero-title'
-MEMBERSHIP = 'ui-caption u-textColorGreenNormal u-fontSize13 u-tintSpectrum u-accentColor--textNormal u-marginBottom20'
-DESCRIPTION = 'ui-body hero-description'
-FOLLOWERS = "button button--chromeless u-baseColor--buttonNormal is-touched"
-AUTHOR_PLUS = 'buttonSet u-noWrap u-marginVertical10'
-
-# Create a connection object
-databaseServerIP = "127.0.0.1"  # IP address of the MySQL database server
-databaseUserName = "root"  # User name of the database server
-databaseUserPassword = "avner"  # Password for the database user
-newDatabaseName = "Toward_DataScience"  # Name of the database that is to be created
-charSet = "utf8mb4"  # Character set
-cursorType = pymysql.cursors.DictCursor
-connectionInstance = pymysql.connect(host=databaseServerIP, user=databaseUserName, password=databaseUserPassword,
-                                     charset=charSet, cursorclass=cursorType)
+import config
 
 
 def export_data_topic(link):
@@ -74,7 +41,7 @@ def browser_scroll(browser):
     last_height = browser.execute_script("return document.body.scrollHeight")
     while True:
         browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(SCROLL_PAUSE_TIME)
+        time.sleep(config.SCROLL_PAUSE_TIME)
         new_height = browser.execute_script("return document.body.scrollHeight")
         if new_height == last_height:
             break
@@ -89,7 +56,14 @@ def insert_mysql_article(id_article, title, subtitle, id_author, page, date, rea
     curr.execute(mySql_insert_query, recordTuple)
 
 
-def export_articles(link_dict, cur):
+def if_exist_article(curr, title, author):
+    curr.execute("""SELECT DISTINCT title 
+    FROM toward_datascience.articles 
+    WHERE toward_datascience.articles.title = %s and toward_datascience.articles.id_author = %s""", (title, author))
+    return curr.fetchone()
+
+
+def export_articles(link_dict, cur, path):
     """
     This function creates an articles datatable which contains the following information about an article:
     Title, Subtitle, Page, Author, Date, Read_time, is_Premium, Link_Author, Link_Article.
@@ -106,39 +80,42 @@ def export_articles(link_dict, cur):
         for topic, link in link_dict.items():
             topic_list.append(topic)
             link_list_topic.append(link)
-        row = 1
+        row = max_id_sql(cur)[1]
         id_author = 1
-        browser = webdriver.Chrome(DRIVER)
+        browser = webdriver.Chrome(path)
         for i in tqdm(range(len(topic_list))):
             browser.get(link_list_topic[i])
             soup2 = browser_scroll(browser)
             for j in range(50):
                 try:
-                    sub = soup2.findAll(class_=ARTICLE_CLASS)[j]
-                    sub2 = soup2.findAll(class_=LINK_ARTICLE_LINK)[j]
-                    sub_author = sub.findAll(BALISE_A)[0]
-                    sub_time = sub.findAll('time')[0]
-                    sub_min = sub.findAll(class_='readingTime')[0]
-                    date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
-                    if len(sub.findAll(class_='svgIcon-use')) != 0:
-                        sub_premium = 1
-                    else:
-                        sub_premium = 0
+                    sub = soup2.findAll(class_=config.ARTICLE_CLASS)[j]
+                    # sub2 = soup2.findAll(class_=config.LINK_ARTICLE_LINK)[j]
+                    title = soup2.findAll(class_=config.TITLE_CLASS)[j].text
+                    sub_author = sub.findAll(config.BALISE_A)[0]
                     if sub_author.text not in dict_author.keys():
-                        dict_author[sub_author.text] = [id_author, sub_author[BALISE_HREF]]
+                        dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
                         id_author += 1
-                    dict_article[row] = sub_author[BALISE_HREF]
-                    insert_mysql_article(int(row),
-                                         soup2.findAll(class_=TITLE_CLASS)[j].text,
-                                         soup2.findAll(class_=SUB_TITLE_CLASS)[j].text,
-                                         dict_author[sub_author.text][0],
-                                         str(topic_list[i]),
-                                         date_format.isoformat(),
-                                         int(sub_min['title'].split(' ')[0]),
-                                         sub_premium, cur)
-                    row += 1
-                    if row % 100 == 0:
-                        connectionInstance.commit()
+                    id_author_name = dict_author[sub_author.text][0]
+                    if if_exist_article(cur, title) is None:
+                        sub_time = sub.findAll('time')[0]
+                        sub_min = sub.findAll(class_='readingTime')[0]
+                        date_format = datetime.datetime.strptime(sub_time['datetime'], '%Y-%m-%dT%H:%M:%S.%fZ').date()
+                        if len(sub.findAll(class_='svgIcon-use')) != 0:
+                            sub_premium = 1
+                        else:
+                            sub_premium = 0
+                        dict_article[row] = sub_author[config.BALISE_HREF]
+                        insert_mysql_article(int(row),
+                                             title,
+                                             soup2.findAll(class_=config.SUB_TITLE_CLASS)[j].text,
+                                             id_author_name,
+                                             str(topic_list[i]),
+                                             date_format.isoformat(),
+                                             int(sub_min['title'].split(' ')[0]),
+                                             sub_premium, cur)
+                        row += 1
+                        if row % 100 == 0:
+                            connectionInstance.commit()
                 except:
                     pass
         connectionInstance.commit()
@@ -147,16 +124,16 @@ def export_articles(link_dict, cur):
         print("Exception occured:{}".format(e))
 
 
-def max_id_sql(curr, data):
+def max_id_sql(curr):
     try:
-        table = 'toward_datascience.' + data
-        mySql_select_max_query = """SELECT MAX(id_article) as max FROM %s """
-        recordTuple = table
-        curr.execute(mySql_select_max_query, recordTuple)
-        result = curr.fetchone()
-        return result['max']
+        curr.execute("""SELECT TABLE_ROWS
+        FROM information_schema.tables
+        WHERE table_schema = 'toward_datascience' 
+        LIMIT 2;""")
+        results = curr.fetchall()
+        return [result['TABLE_ROWS'] + 1 for result in results]
     except:
-        return 0
+        return [1, 1]
 
 
 def insert_mysql_author(id, name, member_since, description, following, followers, social_media, curr):
@@ -167,6 +144,13 @@ def insert_mysql_author(id, name, member_since, description, following, follower
     curr.execute(mySql_insert_query, recordTuple)
 
 
+def if_exist_author(curr, name):
+    curr.execute("""SELECT DISTINCT toward_datascience.authors.name 
+    FROM toward_datascience.authors 
+    WHERE toward_datascience.authors.name = %s""", name)
+    return curr.fetchone()
+
+
 def export_authors(dict_author, curr):
     """
     This function creates an author dataframe which contains the following information about each author of an article
@@ -174,48 +158,51 @@ def export_authors(dict_author, curr):
     Name, Member_Since, Description, Following, Followers, Social_Media.
     The function takes a dataframe of articles as its input and iterates through each "Link_Author" in the dataframe,
     extracts raw html from each author page, and extracts exact information to populate the dataframe.
-    :param data_frame_article: dataframe
-    :return: author: dataframe
+    :param dict_author: dict , curr
+    :return: nothing
     """
-    row = max_id_sql(curr, 'author') + 1
+    row = max_id_sql(curr)[1]
     for key, value in tqdm(dict_author.items()):
         try:
             html = requests.get(value[1])
             soup_extraction = BeautifulSoup(html.text, 'html.parser')
             name_author = soup_extraction.findAll('h1')[0].text
-            member_since = None
-            if len(soup_extraction.findAll(class_=MEMBERSHIP)) != 0:
-                member_since = soup_extraction.findAll(class_=MEMBERSHIP)[0].text
-                member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
+            if if_exist_author(curr, name_author) is None:
+                member_since = None
+                if len(soup_extraction.findAll(class_=config.MEMBERSHIP)) != 0:
+                    member_since = soup_extraction.findAll(class_=config.MEMBERSHIP)[0].text
+                    member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
 
-            if len(soup_extraction.findAll(class_=DESCRIPTION)) != 0 :
-                desc_author = soup_extraction.findAll(class_=DESCRIPTION)[0].text
-            else:
-                desc_author = ''
+                if len(soup_extraction.findAll(class_=config.DESCRIPTION)) != 0:
+                    desc_author = soup_extraction.findAll(class_=config.DESCRIPTION)[0].text
+                else:
+                    desc_author = ''
 
-            info_author_plus = soup_extraction.findAll(class_=AUTHOR_PLUS)[0]
-            if len(info_author_plus.findAll('a')) >= 2:
-                social_media = True
-            else:
-                social_media = False
+                info_author_plus = soup_extraction.findAll(class_=config.AUTHOR_PLUS)[0]
+                if len(info_author_plus.findAll('a')) >= 2:
+                    social_media = True
+                else:
+                    social_media = False
 
-            if len(info_author_plus.findAll('a')) >= 2:
-                following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
-            else:
-                following_author = 0
+                if len(info_author_plus.findAll('a')) >= 2:
+                    following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
+                else:
+                    following_author = 0
 
-            if len(info_author_plus.findAll('a')) >= 2:
-                follower_author = info_author_plus.findAll(
-                    'a')[1]['aria-label'].split(' ')[1]
-            else:
-                follower_author = 0
+                if len(info_author_plus.findAll('a')) >= 2:
+                    follower_author = info_author_plus.findAll(
+                        'a')[1]['aria-label'].split(' ')[1]
+                else:
+                    follower_author = 0
 
-            insert_mysql_author(value[0], name_author, member_since, desc_author,
-                                int(str(following_author).replace(',', '')), int(str(follower_author).replace(',', '')), social_media, curr)
-            row += 1
-            curr.fetchone()
-            if row % 100 == 0:
-                connectionInstance.commit()
+                insert_mysql_author(value[0], name_author, member_since, desc_author,
+                                    int(str(following_author).replace(',', '')),
+                                    int(str(follower_author).replace(',', '')),
+                                    social_media, curr)
+                row += 1
+                curr.fetchone()
+                if row % 100 == 0:
+                    connectionInstance.commit()
         except Exception as e:
             print("Exception occured:{}".format(e))
     connectionInstance.commit()
@@ -225,12 +212,9 @@ def export_articles_details(dict_article, curr):
     """
     This function import more details about the articles of the first dataframe. We have the Title as the key, we have
     the number of claps (as like for facebook) and the different tags on the article>
-    :param data_frame_article: the first dataframe
-    :return: the dataframe of hte detail of each article
+    :param dict_article: dict
+    :return: nothing
     """
-    curr.execute("""ALTER TABLE Toward_DataScience.articles 
-                        ADD COLUMN claps INT NOT NULL AFTER `is_Premium`,
-                        ADD COLUMN tags TEXT NOT NULL AFTER `claps`;""")
     for key, value in tqdm(dict_article.items()):
         html = requests.get(value)
         soup_extraction = BeautifulSoup(html.text, 'html.parser')
@@ -248,7 +232,7 @@ def export_articles_details(dict_article, curr):
 
 def database_definition(cursorInstance):
     try:
-        sqlStatement = "CREATE DATABASE " + newDatabaseName
+        sqlStatement = "CREATE DATABASE " + config.DB_NAME
         cursorInstance.execute(sqlStatement)
         cursorInstance.fetchall()
         cursorInstance.execute('''CREATE TABLE Toward_DataScience.authors (
@@ -269,20 +253,31 @@ def database_definition(cursorInstance):
                             date DATETIME NULL DEFAULT NULL,
                             read_time INT,
                             is_Premium TINYINT(1),
+                            claps INT NULL DEFAULT NULL,
+                            tags TEXT NULL DEFAULT NULL,
                             PRIMARY KEY (id_article))''')
     except Exception as e:
-        print("Exception occured:{}".format(e))
+        print("Your database already exists")
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("driver_path", help="path to the chrome driver", type=str)
+    parser.add_argument("password", help="password for mysql server", type=str)
+    args = parser.parse_args()
+
+    cursorType = pymysql.cursors.DictCursor
+    connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
+                                         password=args.password,
+                                         charset=config.charSet, cursorclass=cursorType)
     print('Each step could take time, so no worry')
     print('Extract Topics')
-    topic_link_dict = export_data_topic(LINK)
+    topic_link_dict = export_data_topic(config.LINK)
     print('Create Database')
     cursorInstance = connectionInstance.cursor()
     database_definition(cursorInstance)
     print('Extract Articles')
-    dict_author, dict_article = export_articles(topic_link_dict, cursorInstance)
+    dict_author, dict_article = export_articles(topic_link_dict, cursorInstance, args.driver_path)
     print('Extract Authors')
     export_authors(dict_author, cursorInstance)
     print('Extract Articles Details')
