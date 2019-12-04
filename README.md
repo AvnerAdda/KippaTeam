@@ -1,4 +1,5 @@
 "# KippaTeam" 
+<<<<<<< HEAD
 This is our program. We import different information from the website: Toward Data Science (https://towardsdatascience.com/)
 The first dataframe is the basics information from the home page of each topic (Data Science, AI, Programming, ...)
 The second dataframe is the authors of each articles, we have the names of the authors, the date of subscription, the
@@ -34,3 +35,6 @@ Stuff ont the drive:
 - pep8 - not done
 - source control - ongoing
 - software design - not done
+=======
+"test'
+>>>>>>> fad7d4294a1d8597eaed9d28707e635b0c2db13b
