@@ -1,5 +1,5 @@
 "# KippaTeam" 
-<<<<<<< HEAD
+
 This is our program. We import different information from the website: Toward Data Science (https://towardsdatascience.com/)
 The first dataframe is the basics information from the home page of each topic (Data Science, AI, Programming, ...)
 The second dataframe is the authors of each articles, we have the names of the authors, the date of subscription, the
@@ -35,6 +35,21 @@ Stuff ont the drive:
 - pep8 - not done
 - source control - ongoing
 - software design - not done
-=======
-"test'
->>>>>>> fad7d4294a1d8597eaed9d28707e635b0c2db13b
+
+<b>CHECKPOINT 2</b>
+
+1. Command line interface
+- Wrap up your web scraper to be able to call it with different arguments from the
+terminal. </b>Done.</b>
+- Use click or argparse packages. <b>Done.</b>
+2. Database implementation
+- Design an ERD for your data. Think about which fields should be primary and foreign
+    keys, and how you distinct new entries from already existing ones. </b>Done.</b>
+
+![Diagram](image/Diagram.PNG)
+
+- Take notice to primary and foreign keys. </b>Done.</b>
+- Write a script that creates your database structure (python or sql), it should be separate
+    from the main scraper code (but should be part of the project and submitted as well). </b>Done.</b>
+- Add to your scraper the ability to store the data it scrapes to the database you designed.
+    It should store only new data and avoid duplicates. </b>Done.</b>
