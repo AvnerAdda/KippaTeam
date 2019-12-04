@@ -17,6 +17,7 @@ import datetime
 import pymysql
 from tqdm import tqdm
 
+
 SCROLL_PAUSE_TIME = 2
 LINK = "https://towardsdatascience.com/"
 ARTICLE_CLASS = 'postMetaInline postMetaInline-authorLockup ui-captionStrong u-flex1 u-noWrapWithEllipsis'
