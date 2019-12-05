@@ -44,7 +44,8 @@ terminal. </b>Done.</b>
 - Use click or argparse packages. <b>Done.</b>
 2. Database implementation
 - Design an ERD for your data. Think about which fields should be primary and foreign
-    keys, and how you distinct new entries from already existing ones. </b>Done.</b>
+keys, and how you distinct new entries from already existing ones. </b> Done. </b>
+>>>>>>> master
 
 ![Diagram](image/Diagram.PNG)
 
@@ -53,3 +54,7 @@ terminal. </b>Done.</b>
     from the main scraper code (but should be part of the project and submitted as well). </b>Done.</b>
 - Add to your scraper the ability to store the data it scrapes to the database you designed.
     It should store only new data and avoid duplicates. </b>Done.</b>
+=======
+from the main scraper code (but should be part of the project and submitted as well). </b>Done.</b>
+- Add to your scraper the ability to store the data it scrapes to the database you designed.
+It should store only new data and avoid duplicates. </b>Done.</b>
