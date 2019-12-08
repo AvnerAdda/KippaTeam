@@ -17,15 +17,22 @@ if __name__ == '__main__':
     cursorInstance = connectionInstance.cursor()
     cursorInstance.execute("""select tags as c from toward_datascience.articles ;""")
     fetch = cursorInstance.fetchall()
-    fetch[1]
+    list_tags = []
     for i in range(len(fetch)):
         tag_list = fetch[i]['c'].split('; ')[1:6]
-        print(tag_list)
-    # cursorInstance.execute("""select date as c from toward_datascience.articles ;""")
-    # date = cursorInstance.fetchall()
-    # kw_list = tag_list[1:6]
-    # pytrends.build_payload(kw_list, cat=0, timeframe='today 5-y', geo='', gprop='news')
-    # df = pytrends.get_historical_interest(kw_list, year_start=2019, month_start=12, day_start=1, hour_start=0,
-    #                                        year_end=2019,
-    #                                        month_end=12, day_end=2, hour_end=0, cat=0, geo='', gprop='', sleep=0)
-    # print(df.columns)
+        list_tags.append(tag_list)
+    cursorInstance.execute("""select date as d from toward_datascience.articles ;""")
+    date = cursorInstance.fetchall()
+    list_dates = []
+    for i in range(len(fetch)):
+        date_list = date[i]['d']
+        list_dates.append(date_list)
+
+    for i in range(len(list_dates)):
+        df = pytrends.get_historical_interest(list_tags[i], year_start=list_dates[i].year,
+                                              month_start=list_dates[i].month,
+                                              day_start=list_dates[i].day, hour_start=0,
+                                              year_end=list_dates[i].year, month_end=list_dates[i].month,
+                                              day_end=list_dates[i].day, hour_end=0,
+                                              cat=0, geo='', gprop='', sleep=0)
+        print(int(df.sum(1)))

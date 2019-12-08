@@ -81,7 +81,6 @@ def if_exist_article(curr, title, page):
     WHERE toward_datascience.articles.title = %s and toward_datascience.articles.page = %s""", (title, page))
     return curr.fetchone()
 
-
 def export_articles(link_dict, cur, path):
     """
     This function creates an articles datatable which contains the following information about an article:
@@ -120,9 +119,10 @@ def export_articles(link_dict, cur, path):
                         else:
                             sub_premium = 0
                         sub_author = sub.findAll(config.BALISE_A)[0]
-                        if sub_author.text not in dict_author.keys():
-                            dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
-                            id_author += 1
+                        if if_exist_author(cur, sub_author.text) is None:
+                            if sub_author.text not in dict_author.keys(): #or sub_author.text not in :
+                                dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
+                                id_author += 1
                         id_author_name = dict_author[sub_author.text][0]
                         dict_article[row] = sub_author[config.BALISE_HREF]
                         insert_mysql_article(int(row),
@@ -152,12 +152,12 @@ def max_id_sql(curr):
     """
     try:
         result = []
-        curr.execute("""select count(*) as c from toward_datascience.authors ;""")
+        curr.execute("""SELECT MAX(id) as max_author FROM toward_datascience.authors ;""")
         results = curr.fetchall()
-        result.append(results[0]['c']+1)
-        curr.execute("""select count(*) as c from toward_datascience.articles ;""")
+        result.append(results[0]['max_author']+1)
+        curr.execute("""SELECT MAX(id_article) as max_article FROM toward_datascience.articles ;""")
         results = curr.fetchall()
-        result.append(results[0]['c']+1)
+        result.append(results[0]['max_article']+1)
         return result
     except:
         return [1, 1]
@@ -228,14 +228,16 @@ def export_authors(dict_author, curr):
                 else:
                     social_media = False
 
-                if len(info_author_plus.findAll('a')) >= 2:
-                    following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
+                if len(info_author_plus.findAll('a')) > 0:
+                    if len(info_author_plus.findAll('a')[0]['aria-label'].split(' ')) > 0:
+                        following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
                 else:
                     following_author = 0
 
-                if len(info_author_plus.findAll('a')) >= 2:
-                    follower_author = info_author_plus.findAll(
-                        'a')[1]['aria-label'].split(' ')[1]
+                if len(info_author_plus.findAll('a')) > 1:
+                    if len(info_author_plus.findAll('a')[1]['aria-label'].split(' ')) >= 2:
+                        follower_author = info_author_plus.findAll(
+                            'a')[1]['aria-label'].split(' ')[1]
                 else:
                     follower_author = 0
 
