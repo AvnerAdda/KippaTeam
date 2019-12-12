@@ -79,7 +79,9 @@ def if_exist_article(curr, title, page):
     curr.execute("""SELECT DISTINCT title 
     FROM toward_datascience.articles 
     WHERE toward_datascience.articles.title = %s and toward_datascience.articles.page = %s""", (title, page))
-    return curr.fetchone()
+    result = curr.fetchone()
+    return result
+
 
 def export_articles(link_dict, cur, path):
     """
@@ -107,9 +109,11 @@ def export_articles(link_dict, cur, path):
             for j in range(50):
                 try:
                     sub = soup2.findAll(class_=config.ARTICLE_CLASS)[j]
-                    # sub2 = soup2.findAll(class_=config.LINK_ARTICLE_LINK)[j]
+                    sub2 = soup2.findAll(class_=config.LINK_ARTICLE_LINK)[j]
                     title = soup2.findAll(class_=config.TITLE_CLASS)[j].text
                     page = str(topic_list[i])
+                    sub_link_article = sub2.findAll('a')[0]
+                    dict_article[row] = sub_link_article[config.DATA_ACTION]
                     if if_exist_article(cur, title, page) is None:
                         sub_time = sub.findAll('time')[0]
                         sub_min = sub.findAll(class_='readingTime')[0]
@@ -119,12 +123,17 @@ def export_articles(link_dict, cur, path):
                         else:
                             sub_premium = 0
                         sub_author = sub.findAll(config.BALISE_A)[0]
-                        if if_exist_author(cur, sub_author.text) is None:
-                            if sub_author.text not in dict_author.keys(): #or sub_author.text not in :
-                                dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
-                                id_author += 1
-                        id_author_name = dict_author[sub_author.text][0]
-                        dict_article[row] = sub_author[config.BALISE_HREF]
+                        detect_author = if_exist_author(cur, sub_author.text)
+                        if sub_author.text not in dict_author.keys():
+                            dict_author[sub_author.text] = [id_author, sub_author[config.BALISE_HREF]]
+                            id_author += 1
+                            id_author_name = dict_author[sub_author.text][0]
+                        else:
+                            if detect_author is not None:
+                                id_author_name = detect_author['id']
+                            else:
+                                id_author_name = dict_author[sub_author.text][0]
+
                         insert_mysql_article(int(row),
                                              title,
                                              soup2.findAll(class_=config.SUB_TITLE_CLASS)[j].text,
@@ -136,7 +145,7 @@ def export_articles(link_dict, cur, path):
                         row += 1
                         if row % 100 == 0:
                             connectionInstance.commit()
-                except:
+                except Exception as e:
                     pass
         connectionInstance.commit()
         return dict_author, dict_article
@@ -189,7 +198,7 @@ def if_exist_author(curr, name):
     :param name: string
     :return: not None/None
     """
-    curr.execute("""SELECT DISTINCT toward_datascience.authors.name 
+    curr.execute("""SELECT DISTINCT toward_datascience.authors.name , toward_datascience.authors.id
     FROM toward_datascience.authors 
     WHERE toward_datascience.authors.name = %s""", name)
     return curr.fetchone()
@@ -228,18 +237,16 @@ def export_authors(dict_author, curr):
                 else:
                     social_media = False
 
+                following_author = 0
                 if len(info_author_plus.findAll('a')) > 0:
                     if len(info_author_plus.findAll('a')[0]['aria-label'].split(' ')) > 0:
                         following_author = info_author_plus.findAll('a')[0]['aria-label'].split(' ')[1]
-                else:
-                    following_author = 0
 
+                follower_author = 0
                 if len(info_author_plus.findAll('a')) > 1:
                     if len(info_author_plus.findAll('a')[1]['aria-label'].split(' ')) >= 2:
                         follower_author = info_author_plus.findAll(
                             'a')[1]['aria-label'].split(' ')[1]
-                else:
-                    follower_author = 0
 
                 insert_mysql_author(value[0], name_author, member_since, desc_author,
                                     int(str(following_author).replace(',', '')),
@@ -265,8 +272,8 @@ def export_articles_details(dict_article, curr):
         html = requests.get(value)
         soup_extraction = BeautifulSoup(html.text, 'html.parser')
         text = soup_extraction.text
-        clap = re.search(r"(?<=ClapCount\"\:)([0-9]+)", text)[0]
-        tags = '; '.join(re.findall(r"(?<=\"\,\"name\"\:\").*?(?=\"\,)", text)[1:])
+        clap = re.search(r"(?<=clapCount\"\:)([0-9]+)", text)[0]
+        tags = '; '.join(re.findall(r"(?<=\"\,\"Tag\:).*?(?=\"\,)", text))
         mySql_update_query = """UPDATE Toward_DataScience.articles SET claps=%s, tags=%s WHERE id_article=%s;"""
         recordTuple = (clap, tags, key)
         curr.execute(mySql_update_query, recordTuple)
@@ -333,4 +340,3 @@ if __name__ == '__main__':
     print('Extract Articles Details')
     export_articles_details(dict_article, cursorInstance)
     connectionInstance.close()
-
