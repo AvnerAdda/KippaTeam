@@ -323,7 +323,7 @@ def extract_article(dict_author, cur, path):
     :return: 0
     """
     browser = webdriver.Chrome(path)
-    for key, value in dict_author.items():
+    for key, value in tqdm(dict_author.items()):
         browser.get(value)
         soup2 = browser_scroll(browser)
         member_since = None
