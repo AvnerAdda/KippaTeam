@@ -1,6 +1,7 @@
 from pytrends.request import TrendReq
 from datetime import timedelta
 import  mysql_config
+from tqdm import tqdm
 
 
 def api_trend(connectionInstance):
@@ -22,7 +23,7 @@ def api_trend(connectionInstance):
     rows = cursorInstance.fetchall()
     total_list = []
     tag_list = []
-    for row in rows:
+    for row in tqdm(rows):
         id = row['id_article']
         date = row['date']
         kw_list = row['tags'].split(';')
