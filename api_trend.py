@@ -1,31 +1,39 @@
-import pymysql
 from pytrends.request import TrendReq
-import config
-import argparse
-import pandas as pd
+from datetime import timedelta
+import  mysql_config
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("driver_path", help="path to the chrome driver", type=str)
-    parser.add_argument("password", help="password for mysql server", type=str)
-    args = parser.parse_args()
-    pytrends = TrendReq(hl='en-US', tz=360)
-    cursorType = pymysql.cursors.DictCursor
-    connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
-                                         password=args.password,
-                                         charset=config.charSet, cursorclass=cursorType)
+
+def api_trend(connectionInstance):
     cursorInstance = connectionInstance.cursor()
-    cursorInstance.execute("""select tags as c from toward_datascience.articles ;""")
-    fetch = cursorInstance.fetchall()
-    fetch[1]
-    for i in range(len(fetch)):
-        tag_list = fetch[i]['c'].split('; ')[1:6]
-        print(tag_list)
-    # cursorInstance.execute("""select date as c from toward_datascience.articles ;""")
-    # date = cursorInstance.fetchall()
-    # kw_list = tag_list[1:6]
-    # pytrends.build_payload(kw_list, cat=0, timeframe='today 5-y', geo='', gprop='news')
-    # df = pytrends.get_historical_interest(kw_list, year_start=2019, month_start=12, day_start=1, hour_start=0,
-    #                                        year_end=2019,
-    #                                        month_end=12, day_end=2, hour_end=0, cat=0, geo='', gprop='', sleep=0)
-    # print(df.columns)
+    try:
+        cursorInstance.execute(mysql_config.add_trend)
+        cursorInstance.fetchone()
+    except:
+        pass
+    pytrends = TrendReq(hl='en-US', tz=360)
+    sqlStatement = '''SELECT id_article, date, tags FROM toward_datascience.articles;'''
+    cursorInstance.execute(sqlStatement)
+    rows = cursorInstance.fetchall()
+    total_list = []
+    tag_list = []
+    for row in rows:
+        id = row['id_article']
+        date = row['date']
+        kw_list = row['tags'].split(';')
+        date1 = date + timedelta(days=1)
+        date_range = date.strftime("%Y-%m-%d") + ' ' + date1.strftime("%Y-%m-%d")
+        tag_count = len(kw_list)
+        tag_list.append(tag_count)
+        pytrends.build_payload(kw_list, cat=0, timeframe=date_range, geo='', gprop='')
+        interest_over_time_df = pytrends.interest_over_time()
+        if not interest_over_time_df.empty:
+            total = 0
+            for i in range(tag_count):
+                total += interest_over_time_df.iloc[:, i].mean()
+        else:
+            total = 0
+        my_sql_update_trend = mysql_config.update_trend
+        recordTuple = (int(total), id)
+        cursorInstance.execute(my_sql_update_trend, recordTuple)
+        cursorInstance.fetchone()
+        connectionInstance.commit()
