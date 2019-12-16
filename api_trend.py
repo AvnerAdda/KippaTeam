@@ -4,6 +4,12 @@ import  mysql_config
 
 
 def api_trend(connectionInstance):
+    """
+    Thus functions enriches the database with data from an external api. The api provides the total amount of trend
+    traffic for all the tags that were used per article on the day that they were posted. This is done by querying
+    the database for article_id, date and tags. The total_trend column is added to the articles table.
+    :param connectionInstance: 
+    """
     cursorInstance = connectionInstance.cursor()
     try:
         cursorInstance.execute(mysql_config.add_trend)
