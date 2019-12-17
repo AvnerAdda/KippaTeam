@@ -136,7 +136,7 @@ def export_author_name(link_dict, cur, path):
         topic_list.append(topic)
         link_list_topic.append(link)
     browser = webdriver.Chrome(path)
-    for i in tqdm(range(1)): #len(topic_list))):
+    for i in tqdm(range(len(topic_list))):
         browser.get(link_list_topic[i])
         soup2 = browser_scroll(browser)
         for j in range(50):
@@ -217,13 +217,11 @@ def extract_article(dict_author, cur, path):
                 if 'K' in clap:
                     clap = float(clap.replace('K', '')) * 1000
                 clap = int(clap)
-                ##
                 response = 0
                 if len(article.findAll(class_=config.BUTTON_CHROME)) > 0:
                     response = int(
                         article.findAll(class_=config.BUTTON_CHROME)[0].text.split(
                             ' ')[0])
-                # print(link_article, date_time, min_2_read, is_prem, clap, response)
                 html = requests.get(link_article)
                 soup_extraction = BeautifulSoup(html.text, 'html.parser')
                 complete = soup_extraction.findAll('article')[0]
@@ -250,15 +248,15 @@ if __name__ == '__main__':
     connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
                                          password=args.password,
                                          charset=config.charSet, cursorclass=cursorType)
-    print('Each step could take time, so no worry')
-    print('Extract Topics')
-    topic_link_dict = export_data_topic(config.LINK)
-    print('Create Database')
-    cursorInstance = connectionInstance.cursor()
-    database_definition(cursorInstance)
-    print('Extract Authors')
-    dict_author = export_author_name(topic_link_dict, cursorInstance, args.driver_path)
-    print('Extract Articles')
-    dict_article = extract_article(dict_author, cursorInstance, args.driver_path)
+    # print('Each step could take time, so no worry')
+    # print('Extract Topics')
+    # topic_link_dict = export_data_topic(config.LINK)
+    # print('Create Database')
+    # cursorInstance = connectionInstance.cursor()
+    # database_definition(cursorInstance)
+    # print('Extract Authors')
+    # dict_author = export_author_name(topic_link_dict, cursorInstance, args.driver_path)
+    # print('Extract Articles')
+    # dict_article = extract_article(dict_author, cursorInstance, args.driver_path)
     print('Extract trend')
     api_trend(connectionInstance)
