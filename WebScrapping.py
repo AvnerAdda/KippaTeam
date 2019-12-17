@@ -4,6 +4,8 @@ By : KippaTeam
 """
 
 import argparse
+
+import pymysql
 import config
 import mysql_config
 import datetime
@@ -242,7 +244,6 @@ if __name__ == '__main__':
     parser.add_argument("driver_path", help="path to the chrome driver", type=str)
     parser.add_argument("password", help="password for mysql server", type=str)
     args = parser.parse_args()
-
     cursorType = pymysql.cursors.DictCursor
     connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
                                          password=args.password,
