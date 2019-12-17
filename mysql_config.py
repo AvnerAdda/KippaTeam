@@ -29,6 +29,9 @@ create_articles = '''CREATE TABLE Toward_DataScience.articles (
 
 add_trend = '''ALTER TABLE Toward_DataScience.articles ADD total_trend INT'''
 
+
+select_trend = '''SELECT id_article, date, tags, total_trend FROM toward_datascience.articles;'''
+
 update_trend = '''UPDATE Toward_DataScience.articles 
     SET total_trend = (%s) 
     WHERE id_article = (%s);'''
