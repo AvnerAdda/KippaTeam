@@ -9,7 +9,6 @@ import mysql_config
 import datetime
 import re
 import time
-import pymysql
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
