@@ -39,12 +39,13 @@ def api_trend(connectionInstance):
                     total = 0
                     for i in range(tag_count):
                         total += interest_over_time_df.iloc[:, i].mean()
+                    total = int(total)
                 else:
                     total = None
             except:
                 total = None
             my_sql_update_trend = mysql_config.update_trend
-            recordTuple = (int(total), id)
+            recordTuple = (total, id)
             cursorInstance.execute(my_sql_update_trend, recordTuple)
             cursorInstance.fetchone()
             connectionInstance.commit()

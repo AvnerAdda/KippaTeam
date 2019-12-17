@@ -201,7 +201,7 @@ def extract_article(dict_author, cur, path):
                             social_media, cur)
 
         ## Insert Articles
-        for i in range(20):
+        for i in range(50):
             try:
                 article = soup2.findAll(class_=config.STREAM_ITEM_TAG)[i]
                 date = article.findAll(class_=config.DARKEN_TAG)[0]
@@ -242,10 +242,11 @@ def extract_article(dict_author, cur, path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("driver_path", help="path to the chrome driver", type=str)
+    parser.add_argument("username", help="username for the database", type=str)
     parser.add_argument("password", help="password for mysql server", type=str)
     args = parser.parse_args()
     cursorType = pymysql.cursors.DictCursor
-    connectionInstance = pymysql.connect(host=config.databaseServerIP, user=config.databaseUserName,
+    connectionInstance = pymysql.connect(host=config.databaseServerIP, user=args.username,
                                          password=args.password,
                                          charset=config.charSet, cursorclass=cursorType)
     print('Each step could take time, so no worry')
