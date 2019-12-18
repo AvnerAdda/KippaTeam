@@ -8,8 +8,6 @@ create_authors = '''CREATE TABLE Toward_DataScience.authors (
                             social_media TINYINT(1) NULL DEFAULT NULL)
                             ENGINE=INNODB'''
 
-
-
 create_articles = '''CREATE TABLE Toward_DataScience.articles (
                             id_article INT AUTO_INCREMENT PRIMARY KEY,
                             title VARCHAR(100) NULL DEFAULT NULL UNIQUE,
@@ -26,22 +24,23 @@ create_articles = '''CREATE TABLE Toward_DataScience.articles (
                                 REFERENCES Toward_DataScience.authors(id))
                             ENGINE=INNODB'''
 
-
 add_trend = '''ALTER TABLE Toward_DataScience.articles ADD total_trend INT'''
 
-
-select_trend = '''SELECT id_article, date, tags, total_trend FROM toward_datascience.articles;'''
+select_trend = '''SELECT id_article, date, tags, total_trend FROM Toward_DataScience.articles;'''
 
 update_trend = '''UPDATE Toward_DataScience.articles 
     SET total_trend = (%s) 
     WHERE id_article = (%s);'''
 
 insert_mysql_author = """INSERT IGNORE INTO Toward_DataScience.authors (name) VALUES (%s)"""
-update_mysql_author = """UPDATE toward_datascience.authors 
+
+update_mysql_author = """UPDATE Toward_DataScience.authors 
     SET member_since = (%s), description = (%s), following = (%s), followers= (%s),
     social_media= (%s)
     WHERE name = (%s);"""
+
 insert_mysql_article = """INSERT INTO Toward_DataScience.articles (title ,subtitle ,\
      id_author, date , read_time , is_Premium, claps, response, tags) 
      VALUES (%s, %s, %s, %s, %s, %s, %s,%s, %s)"""
-select_id = """SELECT id FROM toward_datascience.authors WHERE name = %s"""
+
+select_id = """SELECT id FROM Toward_DataScience.authors WHERE name = %s"""
