@@ -34,6 +34,8 @@ update_trend = '''UPDATE Toward_DataScience.articles
 
 insert_mysql_author = """INSERT IGNORE INTO Toward_DataScience.authors (name) VALUES (%s)"""
 
+check_if_author = """SELECT name FROM Toward_DataScience.authors WHERE name=(%s)"""
+
 update_mysql_author = """UPDATE Toward_DataScience.authors 
     SET member_since = (%s), description = (%s), following = (%s), followers= (%s),
     social_media= (%s)

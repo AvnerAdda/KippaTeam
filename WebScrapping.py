@@ -121,6 +121,17 @@ def select_id(name, curr):
     return result['id']
 
 
+def check_if_exist(name, curr):
+    """
+    :param curr: cursor
+    """
+    mySql_check_query = mysql_config.check_if_author
+    recordTuple = name
+    curr.execute(mySql_check_query, recordTuple)
+    result = curr.fetchone()
+    return result
+
+
 def export_author_name(link_dict, cur, path):
     """
     This function creates an articles datatable which contains the following information about an article:
@@ -169,6 +180,7 @@ def extract_article(dict_author, cur, path):
     """
     browser = webdriver.Chrome(path)
     for key, value in tqdm(dict_author.items()):
+        # if check_if_exist(key, cur) is None:
         browser.get(value)
         soup2 = browser_scroll(browser)
         member_since = None
