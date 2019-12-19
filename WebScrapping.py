@@ -148,8 +148,9 @@ def export_author_name(link_dict, cur, path):
         topic_list.append(topic)
         link_list_topic.append(link)
     chrome_options = Options()  
-    chrome_options.add_argument("--headless") 
-    browser = webdriver.Chrome(path)
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    browser = webdriver.Chrome(path, options=chrome_options)
     for i in tqdm(range(len(topic_list))):
         browser.get(link_list_topic[i])
         soup2 = browser_scroll(browser)
@@ -181,8 +182,9 @@ def extract_article(dict_author, cur, path):
     :return: 0
     """
     chrome_options = Options()  
-    chrome_options.add_argument("--headless")  
-    browser = webdriver.Chrome(path)
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    browser = webdriver.Chrome(path, options=chrome_options)
     for key, value in tqdm(dict_author.items()):
         # if check_if_exist(key, cur) is None:
         browser.get(value)
