@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from tqdm import tqdm
 from api_trend import api_trend
-
+from selenium.webdriver.chrome.options import Options
 
 def export_data_topic(link):
     """
@@ -147,6 +147,8 @@ def export_author_name(link_dict, cur, path):
     for topic, link in tqdm(link_dict.items()):
         topic_list.append(topic)
         link_list_topic.append(link)
+    chrome_options = Options()  
+    chrome_options.add_argument("--headless") 
     browser = webdriver.Chrome(path)
     for i in tqdm(range(len(topic_list))):
         browser.get(link_list_topic[i])
@@ -178,6 +180,8 @@ def extract_article(dict_author, cur, path):
     :param path:
     :return: 0
     """
+    chrome_options = Options()  
+    chrome_options.add_argument("--headless")  
     browser = webdriver.Chrome(path)
     for key, value in tqdm(dict_author.items()):
         # if check_if_exist(key, cur) is None:
