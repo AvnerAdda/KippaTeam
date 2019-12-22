@@ -186,74 +186,77 @@ def extract_article(dict_author, cur, path):
     chrome_options.add_argument("--no-sandbox")
     browser = webdriver.Chrome(path, options=chrome_options)
     for key, value in tqdm(dict_author.items()):
-        # if check_if_exist(key, cur) is None:
-        browser.get(value)
-        soup2 = browser_scroll(browser)
-        member_since = None
-        if len(soup2.findAll(class_=config.MEMBERSHIP)) != 0:
-            member_since = soup2.findAll(class_=config.MEMBERSHIP)[0].text
-            member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
+        try:
+            # if check_if_exist(key, cur) is None:
+            browser.get(value)
+            soup2 = browser_scroll(browser)
+            member_since = None
+            if len(soup2.findAll(class_=config.MEMBERSHIP)) != 0:
+                member_since = soup2.findAll(class_=config.MEMBERSHIP)[0].text
+                member_since = str(datetime.datetime.strptime(member_since[20:], '%b %Y').date().isoformat())
 
-        if len(soup2.findAll(class_=config.DESCRIPTION)) != 0:
-            desc_author = soup2.findAll(class_=config.DESCRIPTION)[0].text
-        else:
-            desc_author = ''
-        info_author_plus = soup2.findAll(class_=config.AUTHOR_PLUS)[0]
-        if len(info_author_plus.findAll('a')) >= 2:
-            social_media = True
-        else:
-            social_media = False
-        following_author = 0
-        if len(info_author_plus.findAll('a')) > 0:
-            if len(info_author_plus.findAll('a')[0][config.ARIA_TAG].split(' ')) > 0:
-                following_author = info_author_plus.findAll('a')[0][config.ARIA_TAG].split(' ')[1]
-        follower_author = 0
-        if len(info_author_plus.findAll('a')) > 1:
-            if len(info_author_plus.findAll('a')[1][config.ARIA_TAG].split(' ')) >= 2:
-                follower_author = info_author_plus.findAll(
-                    'a')[1][config.ARIA_TAG].split(' ')[1]
+            if len(soup2.findAll(class_=config.DESCRIPTION)) != 0:
+                desc_author = soup2.findAll(class_=config.DESCRIPTION)[0].text
+            else:
+                desc_author = ''
+            info_author_plus = soup2.findAll(class_=config.AUTHOR_PLUS)[0]
+            if len(info_author_plus.findAll('a')) >= 2:
+                social_media = True
+            else:
+                social_media = False
+            following_author = 0
+            if len(info_author_plus.findAll('a')) > 0:
+                if len(info_author_plus.findAll('a')[0][config.ARIA_TAG].split(' ')) > 0:
+                    following_author = info_author_plus.findAll('a')[0][config.ARIA_TAG].split(' ')[1]
+            follower_author = 0
+            if len(info_author_plus.findAll('a')) > 1:
+                if len(info_author_plus.findAll('a')[1][config.ARIA_TAG].split(' ')) >= 2:
+                    follower_author = info_author_plus.findAll(
+                        'a')[1][config.ARIA_TAG].split(' ')[1]
 
-        update_mysql_author(key, member_since, desc_author,
-                            int(str(following_author).replace(',', '')),
-                            int(str(follower_author).replace(',', '')),
-                            social_media, cur)
+            update_mysql_author(key, member_since, desc_author,
+                                int(str(following_author).replace(',', '')),
+                                int(str(follower_author).replace(',', '')),
+                                social_media, cur)
 
-        ## Insert Articles
-        for i in range(50):
-            try:
-                article = soup2.findAll(class_=config.STREAM_ITEM_TAG)[i]
-                date = article.findAll(class_=config.DARKEN_TAG)[0]
-                link_article = date['href']
-                date_time = datetime.datetime.strptime(date.findAll(attrs={config.DATETIME: True})[0][config.DATETIME],
-                                                       '%Y-%m-%dT%H:%M:%S.%fZ')
-                min_2_read = int(article.findAll(class_='readingTime')[0]['title'].split(' ')[0])
-                is_prem = False
-                if len(article.findAll(class_='u-paddingLeft4')) > 0:
-                    is_prem = True
-                clap = article.findAll(
-                    class_=config.BUTTON_TAG)[
-                    0].text
-                if 'K' in clap:
-                    clap = float(clap.replace('K', '')) * 1000
-                clap = int(clap)
-                response = 0
-                if len(article.findAll(class_=config.BUTTON_CHROME)) > 0:
-                    response = int(
-                        article.findAll(class_=config.BUTTON_CHROME)[0].text.split(
-                            ' ')[0])
-                html = requests.get(link_article)
-                soup_extraction = BeautifulSoup(html.text, 'html.parser')
-                complete = soup_extraction.findAll('article')[0]
-                title = complete.findAll('h1', {'class': True})[0].text
-                sub_title = complete.findAll('h2', {'class': True})[0].text
-                text = soup_extraction.text
-                tags = '; '.join(re.findall(r"(?<=\"\,\"Tag\:).*?(?=\"\,)", text))
-                id_author = select_id(key, cur)
+            ## Insert Articles
+            for i in range(50):
+                try:
+                    article = soup2.findAll(class_=config.STREAM_ITEM_TAG)[i]
+                    date = article.findAll(class_=config.DARKEN_TAG)[0]
+                    link_article = date['href']
+                    date_time = datetime.datetime.strptime(date.findAll(attrs={config.DATETIME: True})[0][config.DATETIME],
+                                                           '%Y-%m-%dT%H:%M:%S.%fZ')
+                    min_2_read = int(article.findAll(class_='readingTime')[0]['title'].split(' ')[0])
+                    is_prem = False
+                    if len(article.findAll(class_='u-paddingLeft4')) > 0:
+                        is_prem = True
+                    clap = article.findAll(
+                        class_=config.BUTTON_TAG)[
+                        0].text
+                    if 'K' in clap:
+                        clap = float(clap.replace('K', '')) * 1000
+                    clap = int(clap)
+                    response = 0
+                    if len(article.findAll(class_=config.BUTTON_CHROME)) > 0:
+                        response = int(
+                            article.findAll(class_=config.BUTTON_CHROME)[0].text.split(
+                                ' ')[0])
+                    html = requests.get(link_article)
+                    soup_extraction = BeautifulSoup(html.text, 'html.parser')
+                    complete = soup_extraction.findAll('article')[0]
+                    title = complete.findAll('h1', {'class': True})[0].text
+                    sub_title = complete.findAll('h2', {'class': True})[0].text
+                    text = soup_extraction.text
+                    tags = '; '.join(re.findall(r"(?<=\"\,\"Tag\:).*?(?=\"\,)", text))
+                    id_author = select_id(key, cur)
 
-                insert_mysql_article(title, sub_title, id_author, date_time, min_2_read, is_prem, clap, response, tags,
-                                     cur)
-            except:
-                pass
+                    insert_mysql_article(title, sub_title, id_author, date_time, min_2_read, is_prem, clap, response, tags,
+                                         cur)
+                except:
+                    pass
+        except:
+            pass
     return 0
 
 
